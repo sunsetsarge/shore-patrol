@@ -17,6 +17,12 @@ export function createTurret(weapons) {
     firing: false,        // held state for auto weapons
     lastFireAttempt: 0,   // for empty-click flash timing
     emptyFlashTimer: 0,
+    riseT: 0,             // 0..1, "powering up" rise animation for the active
+                           // turret-rack sprite, reset to 0 on weapon switch,
+                           // animates to 1 over RISE_DURATION seconds.
+    recoilTimer: 0,        // seconds remaining of recoil kick, set on fire,
+                           // ticks down to 0 (drives the active rack sprite's
+                           // recoil offset).
   };
 }
 
@@ -26,7 +32,11 @@ export function activeWeapon(turret) {
 
 export function setActiveIndex(turret, idx) {
   const n = turret.weapons.length;
-  turret.activeIndex = ((idx % n) + n) % n;
+  const next = ((idx % n) + n) % n;
+  if (next !== turret.activeIndex) {
+    turret.activeIndex = next;
+    turret.riseT = 0; // reset the "powering up" rise animation on switch
+  }
 }
 
 export function cycleWeapon(turret, dir) {
@@ -62,6 +72,9 @@ export function updateAim(turret, mouseX, mouseY) {
   turret.barrelAngle = Math.atan2(mouseY - originY, mouseX - originX);
 }
 
+const RISE_DURATION = 0.25; // seconds — matches SPEC_PHASE2_POLISH.md section F
+const RECOIL_DURATION = 0.12;
+
 export function tickCooldowns(turret, dt) {
   for (const w of turret.weapons) {
     if (turret.cooldowns[w.id] > 0) {
@@ -71,6 +84,27 @@ export function tickCooldowns(turret, dt) {
   if (turret.emptyFlashTimer > 0) {
     turret.emptyFlashTimer = Math.max(0, turret.emptyFlashTimer - dt);
   }
+  if (turret.riseT < 1) {
+    turret.riseT = Math.min(1, turret.riseT + dt / RISE_DURATION);
+  }
+  if (turret.recoilTimer > 0) {
+    turret.recoilTimer = Math.max(0, turret.recoilTimer - dt);
+  }
+}
+
+// Called by weaponSystem on every successful fire to kick off the turret
+// rack's recoil visual (translate down/back a few px, decaying over
+// RECOIL_DURATION). Generic — no weapon-id branching.
+export function triggerRecoil(turret) {
+  turret.recoilTimer = RECOIL_DURATION;
+}
+
+export function recoilT01(turret) {
+  return RECOIL_DURATION > 0 ? clamp01(turret.recoilTimer / RECOIL_DURATION) : 0;
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v));
 }
 
 export function canFire(turret, weapon) {

@@ -1,8 +1,9 @@
 // Reads weapons.json-derived defs. fireModeHandlers registry dispatches on
 // the `fireMode` schema field — no weapon id branching anywhere in this file.
-import { project, unprojectD, unprojectX } from '../engine/renderer.js';
+import { project, unprojectD, unprojectX, resolveSpritePath } from '../engine/renderer.js';
 import { screenDistance, withinSplash } from '../engine/collision.js';
 import * as Turret from '../engine/turret.js';
+import * as Sprites from '../engine/sprites.js';
 
 let weaponDefs = [];
 
@@ -17,46 +18,112 @@ function domainForEnemy(entity) {
   return entity.type.domain;
 }
 
+const HIT_PAD = 6;
+
+// pointHitsSprite: same draw geometry as renderer.drawEntityGlyph /
+// renderer.drawCrate — bottom-anchored rect for land/sea, center-anchored
+// for air, height = hitbox*2.4*scale*spriteScale, width from the loaded
+// image's aspect ratio. `domain` null/undefined is treated as non-air
+// (bottom-anchored), matching drawEntityGlyph's `domain === 'air'` check.
+function pointHitsSprite(px, py, sx, sy, scale, hitbox, spriteScale, domain, img) {
+  const drawH = hitbox * 2.4 * scale * (spriteScale || 1);
+  const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+  let top, bottom;
+  if (domain === 'air') {
+    top = sy - drawH / 2;
+    bottom = sy + drawH / 2;
+  } else {
+    top = sy - drawH;
+    bottom = sy;
+  }
+  const left = sx - drawW / 2;
+  const right = sx + drawW / 2;
+  return px >= left - HIT_PAD && px <= right + HIT_PAD &&
+    py >= top - HIT_PAD && py <= bottom + HIT_PAD;
+}
+
+// pointHitsCrateSprite: crate draw height is 90*scale*spriteScale (renderer.drawCrate),
+// always bottom-anchored.
+function pointHitsCrateSprite(px, py, sx, sy, scale, spriteScale, img) {
+  const drawH = 90 * scale * (spriteScale || 1);
+  const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+  const top = sy - drawH;
+  const bottom = sy;
+  const left = sx - drawW / 2;
+  const right = sx + drawW / 2;
+  return px >= left - HIT_PAD && px <= right + HIT_PAD &&
+    py >= top - HIT_PAD && py <= bottom + HIT_PAD;
+}
+
 function projectedHitTest(game, weapon, screenX, screenY) {
   // Return nearest-d target among live enemies whose domain is targetable and
-  // whose projected hitbox contains the screen point.
+  // whose projected hit area (sprite rect if loaded, else fallback circle)
+  // contains the screen point.
   let best = null;
   let bestD = Infinity;
   for (const e of game.entities) {
-    if (e.dead || e.kind !== 'enemy') continue;
-    if (!weapon.targetDomains.includes(domainForEnemy(e))) continue;
-    const { sx, sy, scale } = project(e.x, e.d, e.alt, domainForEnemy(e));
-    const r = e.type.hitbox * scale;
-    if (screenDistance(screenX, screenY, sx, sy) <= r) {
-      if (e.d < bestD) { bestD = e.d; best = e; }
+    if (e.dead || e.dying || e.kind !== 'enemy') continue;
+    const domain = domainForEnemy(e);
+    if (!weapon.targetDomains.includes(domain)) continue;
+    const { sx, sy, scale } = project(e.x, e.d, e.alt, domain);
+    const spritePath = resolveSpritePath(e.type.sprite, e.type.spriteFps, e.age);
+    const img = spritePath ? Sprites.get(spritePath) : null;
+    let hit;
+    if (img) {
+      hit = pointHitsSprite(screenX, screenY, sx, sy, scale, e.type.hitbox, e.type.spriteScale, domain, img);
+    } else {
+      // fallback circle: centered at (sy - hitbox*scale) for land/sea, current
+      // (center-anchored) behavior for air.
+      const r = e.type.hitbox * scale;
+      const cy = domain === 'air' ? sy : sy - e.type.hitbox * scale;
+      hit = screenDistance(screenX, screenY, sx, cy) <= r;
     }
+    if (hit && e.d < bestD) { bestD = e.d; best = e; }
   }
   // also test crates if targetable
   if (weapon.targetDomains.includes('crate')) {
     for (const c of game.crates) {
       if (c.dead) continue;
       const { sx, sy, scale } = project(c.x, 0, c.alt, 'air');
-      const r = 20 * scale;
-      if (screenDistance(screenX, screenY, sx, sy) <= r) {
-        if (0 < bestD) { bestD = 0; best = c; }
+      const spritePath = resolveSpritePath(c.type && c.type.sprite, c.type && c.type.spriteFps, c.age);
+      const img = spritePath ? Sprites.get(spritePath) : null;
+      let hit;
+      if (img) {
+        hit = pointHitsCrateSprite(screenX, screenY, sx, sy, scale, c.type && c.type.spriteScale, img);
+      } else {
+        const r = 20 * scale;
+        hit = screenDistance(screenX, screenY, sx, sy) <= r;
       }
+      if (hit && 0 < bestD) { bestD = 0; best = c; }
     }
   }
   return best;
 }
 
 function applyDamage(game, target, damage) {
-  if (!target || target.dead) return;
+  if (!target || target.dead || target.dying) return;
   target.hp -= damage;
   if (target.hp <= 0) {
-    target.dead = true;
     target.killedByPlayer = true;
+    // Entities (enemies only — crates have no deathSprite) with a deathSprite
+    // def enter a `dying` state instead of immediate removal: they linger,
+    // play a one-shot death animation, then get removed by spawnSystem. Score/
+    // streak/effects still fire at this exact moment via the killMoment flag,
+    // processed once by spawnSystem regardless of how long the corpse lingers.
+    if (target.type && target.type.deathSprite) {
+      target.dying = true;
+      target.deathAge = 0;
+      target.killMoment = true;
+    } else {
+      target.dead = true;
+      target.killMoment = true;
+    }
   }
 }
 
 function splashDamage(game, weapon, worldX, worldD) {
   for (const e of game.entities) {
-    if (e.dead || e.kind !== 'enemy') continue;
+    if (e.dead || e.dying || e.kind !== 'enemy') continue;
     if (!weapon.targetDomains.includes(domainForEnemy(e))) continue;
     if (withinSplash(worldX, worldD, e.x, e.d, weapon.splashRadius)) {
       applyDamage(game, e, weapon.damage);
@@ -126,7 +193,7 @@ function fireGuided(game, weapon, turret) {
   let best = null;
   let bestDist = 140;
   for (const e of game.entities) {
-    if (e.dead || e.kind !== 'enemy' || e.type.domain !== 'air') continue;
+    if (e.dead || e.dying || e.kind !== 'enemy' || e.type.domain !== 'air') continue;
     const { sx, sy } = project(e.x, e.d, e.alt, 'air');
     const dist = screenDistance(turret.aimX, turret.aimY, sx, sy);
     if (dist <= bestDist) { bestDist = dist; best = e; }
@@ -157,6 +224,7 @@ export function tryFire(game) {
   if (!Turret.canFire(turret, weapon)) return;
   Turret.startCooldown(turret, weapon);
   Turret.decrementAmmo(turret, weapon.id);
+  Turret.triggerRecoil(turret);
   const handler = fireModeHandlers[weapon.fireMode];
   if (handler) {
     handler(game, weapon, turret);
@@ -187,7 +255,7 @@ export function update(game, dt) {
       }
     } else if (p.kind === 'missile') {
       const speed = p.weapon.projectileSpeed * dt;
-      if (p.target && !p.target.dead) {
+      if (p.target && !p.target.dead && !p.target.dying) {
         const dx = p.target.x - p.x;
         const dd = p.target.d - p.d;
         const dalt = (p.target.alt || 0) - p.alt;

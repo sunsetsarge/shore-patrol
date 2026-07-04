@@ -7,25 +7,25 @@
       "dropSpeed": 0.055,
       "spawnWeight": 3,
       "color": "#e8c832",
-      "sprite": "assets/crate.png"
+      "sprite": "assets/crate_mg.png"
     },
     {
       "id": "howitzer_crate",
       "weaponId": "howitzer",
-      "amount": 6,
+      "amount": 8,
       "dropSpeed": 0.055,
-      "spawnWeight": 1,
+      "spawnWeight": 3,
       "color": "#e8c832",
-      "sprite": "assets/crate.png"
+      "sprite": "assets/crate_howitzer.png"
     },
     {
       "id": "sam_crate",
       "weaponId": "sam",
       "amount": 4,
       "dropSpeed": 0.055,
-      "spawnWeight": 1,
+      "spawnWeight": 2,
       "color": "#e8c832",
-      "sprite": "assets/crate.png"
+      "sprite": "assets/crate_sam.png"
     }
   ]
 }

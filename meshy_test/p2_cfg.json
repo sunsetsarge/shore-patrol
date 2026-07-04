@@ -1,0 +1,78 @@
+{
+ "out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_p2",
+ "res": 768,
+ "units": [
+  {
+   "name": "infantry_death",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/infantry_death.glb",
+   "frames": 6,
+   "azimuth_deg": 0,
+   "oneshot": true
+  },
+  {
+   "name": "commando_death",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/commando_death.glb",
+   "frames": 6,
+   "azimuth_deg": 0,
+   "oneshot": true
+  },
+  {
+   "name": "tank",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/tank.glb",
+   "frames": 4,
+   "azimuth_deg": 45,
+   "wobble": {
+    "pitch": 1.2,
+    "bob": 0.005
+   }
+  },
+  {
+   "name": "landing_craft",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb",
+   "frames": 4,
+   "azimuth_deg": 300,
+   "wobble": {
+    "roll": 1.5,
+    "bob": 0.008
+   }
+  },
+  {
+   "name": "helicopter",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/helicopter.glb",
+   "frames": 4,
+   "azimuth_deg": 225,
+   "wobble": {
+    "roll": 2.0,
+    "bob": 0.015
+   }
+  },
+  {
+   "name": "wpn_mg",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/wpn_mg.glb",
+   "frames": 1,
+   "azimuth_deg": 45,
+   "elev_deg": 18
+  },
+  {
+   "name": "wpn_howitzer",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/wpn_howitzer.glb",
+   "frames": 1,
+   "azimuth_deg": 45,
+   "elev_deg": 18
+  },
+  {
+   "name": "wpn_sam",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/wpn_sam.glb",
+   "frames": 1,
+   "azimuth_deg": 45,
+   "elev_deg": 18
+  },
+  {
+   "name": "wpn_pistol",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/wpn_pistol.glb",
+   "frames": 1,
+   "azimuth_deg": 45,
+   "elev_deg": 18
+  }
+ ]
+}

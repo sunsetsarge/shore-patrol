@@ -27,7 +27,16 @@
         "assets/frames/infantry_7.png"
       ],
       "spriteScale": 1.4,
-      "spriteFps": 10
+      "spriteFps": 10,
+      "deathSprite": [
+        "assets/frames/infantry_death_0.png",
+        "assets/frames/infantry_death_1.png",
+        "assets/frames/infantry_death_2.png",
+        "assets/frames/infantry_death_3.png",
+        "assets/frames/infantry_death_4.png",
+        "assets/frames/infantry_death_5.png"
+      ],
+      "deathFps": 10
     },
     {
       "id": "tank",
@@ -45,8 +54,14 @@
       "color": "#5c6b2e",
       "shape": "tank",
       "behaviorScript": null,
-      "sprite": "assets/frames/tank_0.png",
-      "spriteScale": 1.3
+      "sprite": [
+        "assets/frames/tank_0.png",
+        "assets/frames/tank_1.png",
+        "assets/frames/tank_2.png",
+        "assets/frames/tank_3.png"
+      ],
+      "spriteScale": 1.3,
+      "spriteFps": 6
     },
     {
       "id": "landing_craft",
@@ -68,8 +83,14 @@
       "color": "#3a4a5c",
       "shape": "boat",
       "behaviorScript": null,
-      "sprite": "assets/frames/landing_craft_0.png",
-      "spriteScale": 1.4
+      "sprite": [
+        "assets/frames/landing_craft_0.png",
+        "assets/frames/landing_craft_1.png",
+        "assets/frames/landing_craft_2.png",
+        "assets/frames/landing_craft_3.png"
+      ],
+      "spriteScale": 1.4,
+      "spriteFps": 6
     },
     {
       "id": "helicopter",
@@ -87,8 +108,14 @@
       "color": "#4a4a4a",
       "shape": "heli",
       "behaviorScript": null,
-      "sprite": "assets/frames/helicopter_0.png",
-      "spriteScale": 1.5
+      "sprite": [
+        "assets/frames/helicopter_0.png",
+        "assets/frames/helicopter_1.png",
+        "assets/frames/helicopter_2.png",
+        "assets/frames/helicopter_3.png"
+      ],
+      "spriteScale": 1.5,
+      "spriteFps": 6
     },
     {
       "id": "commando",
@@ -117,7 +144,16 @@
         "assets/frames/commando_7.png"
       ],
       "spriteScale": 1.4,
-      "spriteFps": 10
+      "spriteFps": 10,
+      "deathSprite": [
+        "assets/frames/commando_death_0.png",
+        "assets/frames/commando_death_1.png",
+        "assets/frames/commando_death_2.png",
+        "assets/frames/commando_death_3.png",
+        "assets/frames/commando_death_4.png",
+        "assets/frames/commando_death_5.png"
+      ],
+      "deathFps": 10
     }
   ]
 }

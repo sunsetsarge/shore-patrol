@@ -20,7 +20,7 @@ const DEFAULT_SPRITE_FPS = 8;
 
 // resolveSpritePath(sprite, spriteFps, age) -> path string or null.
 // sprite may be a static path string or an array of frame path strings.
-function resolveSpritePath(sprite, spriteFps, age) {
+export function resolveSpritePath(sprite, spriteFps, age) {
   if (!sprite) return null;
   if (!Array.isArray(sprite)) return sprite;
   if (sprite.length === 0) return null;
@@ -30,6 +30,17 @@ function resolveSpritePath(sprite, spriteFps, age) {
 }
 
 import * as Sprites from './sprites.js';
+
+// resolveOneShotFramePath(frames, fps, age) -> path string or null.
+// Same frame-index math as resolveSpritePath but CLAMPED to the last frame
+// instead of looping via modulo — used for one-shot animations (death) that
+// must hold their final frame rather than restart.
+export function resolveOneShotFramePath(frames, fps, age) {
+  if (!frames || frames.length === 0) return null;
+  const f = fps || DEFAULT_SPRITE_FPS;
+  const idx = Math.min(frames.length - 1, Math.floor((age || 0) * f));
+  return frames[idx];
+}
 
 const CANVAS_W = 1280;
 const CANVAS_H = 720;
@@ -43,17 +54,23 @@ function lerp(a, b, t) {
 
 // project(x, d, alt) -> {sx, sy, scale}
 // domain optional: 'land' | 'sea' | 'air' (ground default = land band)
+// Sea has its own y-band (WATERLINE_Y..HORIZON_Y) and scale range distinct
+// from land, so craft hand off plausibly in size to land units at d=0.
 export function project(x, d, alt = 0, domain = 'land') {
-  const scale = lerp(1.0, 0.18, clamp01(d));
-  let sy;
+  const d01 = clamp01(d);
+  let sy, scale;
   if (domain === 'air') {
+    scale = lerp(1.0, 0.18, d01);
     sy = lerp(320, 80, clamp01(alt)) - d * 120;
     sy = Math.max(40, sy);
+  } else if (domain === 'sea') {
+    scale = lerp(0.55, 0.18, d01);
+    sy = lerp(SEA_Y, HORIZON_Y, d01);
   } else {
-    const horizonYForDomain = domain === 'sea' ? 260 : 420;
-    sy = lerp(640, horizonYForDomain, clamp01(d));
+    scale = lerp(1.0, 0.18, d01);
+    sy = lerp(640, 420, d01);
   }
-  const sx = 640 + x * 640 * lerp(1.0, 0.55, clamp01(d));
+  const sx = 640 + x * 640 * lerp(1.0, 0.55, d01);
   return { sx, sy, scale };
 }
 
@@ -62,6 +79,8 @@ function clamp01(v) {
 }
 
 // Invert projection: given a screen y and a domain band, estimate world d.
+// Must mirror project()'s per-domain y formula exactly (used by ballistic
+// aiming so shells aimed at the sea band land where the cursor is).
 export function unprojectD(sy, domain) {
   if (domain === 'air') {
     // sy = lerp(320,80,alt) - d*120  => approximate with alt=0.3 default hover band
@@ -70,9 +89,13 @@ export function unprojectD(sy, domain) {
     const d = clamp01((base - sy) / 120);
     return clamp01(d);
   }
-  const horizonYForDomain = domain === 'sea' ? 260 : 420;
-  // sy = lerp(640, horizonYForDomain, d) => d = (640-sy)/(640-horizonYForDomain)
-  const t = (640 - sy) / (640 - horizonYForDomain);
+  if (domain === 'sea') {
+    // sy = lerp(SEA_Y, HORIZON_Y, d) => d = (SEA_Y-sy)/(SEA_Y-HORIZON_Y)
+    const t = (SEA_Y - sy) / (SEA_Y - HORIZON_Y);
+    return clamp01(t);
+  }
+  // sy = lerp(640, 420, d) => d = (640-sy)/(640-420)
+  const t = (640 - sy) / (640 - 420);
   return clamp01(t);
 }
 
@@ -151,6 +174,25 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
   const type = entity.type || {};
   const shape = type.shape;
   const color = type.color || '#ffffff';
+
+  // Dying entities (deathSprite present, entity.dying set by weaponSystem on
+  // kill) play a one-shot death animation instead of the normal sprite/glyph.
+  // Same height rule as normal sprites (hitbox*2.4*scale*spriteScale),
+  // aspect-correct width from the loaded frame, always bottom-anchored
+  // (death frames show the subject falling sideways, regardless of domain).
+  if (entity.dying && type.deathSprite) {
+    const deathPath = resolveOneShotFramePath(type.deathSprite, type.deathFps, entity.deathAge);
+    const deathImg = deathPath ? Sprites.get(deathPath) : null;
+    if (deathImg) {
+      const spriteScale = type.spriteScale || 1.0;
+      const drawH = (type.hitbox || 26) * 2.4 * scale * spriteScale;
+      const drawW = drawH * (deathImg.naturalWidth / deathImg.naturalHeight);
+      ctx.drawImage(deathImg, sx - drawW / 2, sy - drawH, drawW, drawH);
+      return;
+    }
+    // death frame not loaded yet — fall through to normal sprite/glyph so
+    // nothing pops out of existence while the image loads.
+  }
 
   const spritePath = resolveSpritePath(type.sprite, type.spriteFps, entity.age);
   const img = spritePath ? Sprites.get(spritePath) : null;
@@ -293,7 +335,17 @@ export function drawBackground(ctx, t) {
 }
 
 // -------------------- turret --------------------
-export function drawTurret(ctx, turret) {
+// Rack geometry constants (SPEC_PHASE2_POLISH.md section F): slots evenly
+// spaced across ~440px centered at x=640, baseline y~712.
+// Rack sits bottom-right, clear of the HUD weapon pips (x 40..630, y 660+).
+const RACK_WIDTH = 400;
+const RACK_CENTER_X = 900;
+const RACK_BASELINE_Y = 712;
+const RACK_DRAW_H = 72;
+const RACK_RISE_PX = 18; // active sprite rises this many px over riseT 0->1
+const RACK_RECOIL_PX = 6; // active sprite recoils down/back this many px at recoilTimer=1
+
+function drawVectorBarrel(ctx, turret) {
   const originX = 640;
   const originY = 700;
   const barrelLen = 90;
@@ -317,6 +369,66 @@ export function drawTurret(ctx, turret) {
   ctx.fillStyle = '#222';
   ctx.fillRect(barrelLen - 10, -10, 10, 20);
   ctx.restore();
+}
+
+// drawTurret: renders the weapon rack along the bottom-center parapet — one
+// slot per weapon in weapons.json order. Weapons with a `turretSprite` draw
+// that sprite (active = raised + full opacity + color glow + recoil offset;
+// inactive = lowered + 55% opacity). The active weapon, if it has NO
+// turretSprite, falls back to the original vector barrel glyph so nothing
+// regresses for data without turret art.
+export function drawTurret(ctx, turret) {
+  const weapons = turret.weapons;
+  const n = weapons.length;
+  const slotSpacing = n > 1 ? RACK_WIDTH / (n - 1) : 0;
+  const startX = n > 1 ? RACK_CENTER_X - RACK_WIDTH / 2 : RACK_CENTER_X;
+
+  let activeHasSprite = false;
+
+  weapons.forEach((w, i) => {
+    if (!w.turretSprite) return;
+    const img = Sprites.get(w.turretSprite);
+    if (!img) return;
+    const active = i === turret.activeIndex;
+    if (active) activeHasSprite = true;
+
+    const slotX = n > 1 ? startX + i * slotSpacing : RACK_CENTER_X;
+    const turretScale = w.turretScale || 1.0;
+    const drawH = RACK_DRAW_H * turretScale * (active ? 1.25 : 1);
+    const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+
+    const riseOffset = active ? -RACK_RISE_PX * clamp01(turret.riseT || 0) : 0;
+    const recoilOffset = active ? RACK_RECOIL_PX * recoilT01(turret) : 0;
+    const slotY = RACK_BASELINE_Y + riseOffset + recoilOffset;
+
+    ctx.save();
+    if (active) {
+      // soft glow ellipse behind/under the active weapon, tinted with its color
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      const grad = ctx.createRadialGradient(slotX, slotY, 0, slotX, slotY, drawW * 0.6);
+      grad.addColorStop(0, w.color || '#ffffff');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(slotX, slotY, drawW * 0.6, drawH * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.globalAlpha = 0.55;
+    }
+    ctx.drawImage(img, slotX - drawW / 2, slotY - drawH, drawW, drawH);
+    ctx.restore();
+  });
+
+  if (!activeHasSprite) {
+    drawVectorBarrel(ctx, turret);
+  }
+}
+
+function recoilT01(turret) {
+  return Math.max(0, Math.min(1, (turret.recoilTimer || 0) / 0.12));
 }
 
 export function drawMuzzleFlash(ctx, turret, alpha) {

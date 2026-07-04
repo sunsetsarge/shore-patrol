@@ -64,18 +64,37 @@ for unit in cfg["units"]:
     add_sun("key", (math.radians(50), 0, math.radians(-30)), 3.5)
     add_sun("fill", (math.radians(60), 0, math.radians(140)), 1.2)
 
-    if nframes > 1 and bpy.data.actions:
+    wobble = unit.get("wobble")  # {"pitch":deg,"roll":deg,"bob":frac} static multi-frame motion
+    oneshot = unit.get("oneshot", False)  # sample through the FINAL pose (death anims)
+    animated = nframes > 1 and bpy.data.actions and not wobble
+    if animated:
         act = max(bpy.data.actions, key=lambda a: a.frame_range[1]-a.frame_range[0])
         f0, f1 = act.frame_range
         sc.frame_start, sc.frame_end = int(f0), int(math.ceil(f1))
-        frames = [int(round(f0 + i*(f1-f0)/nframes)) for i in range(nframes)]
+        if oneshot:
+            frames = [int(round(f0 + i*(f1-f0)/(nframes-1))) for i in range(nframes)]
+        else:
+            frames = [int(round(f0 + i*(f1-f0)/nframes)) for i in range(nframes)]
+    elif wobble:
+        frames = list(range(nframes))
     else:
         frames = [sc.frame_current]
-    sc.frame_set(frames[0])
 
     dg = bpy.context.evaluated_depsgraph_get()
     meshes = [o for o in sc.objects if o.type == 'MESH']
-    lo, hi = world_bbox(meshes, dg)
+    if animated:
+        # union bbox across ALL sampled frames so falls stay in frame
+        lo = hi = None
+        for f in frames:
+            sc.frame_set(f)
+            dg = bpy.context.evaluated_depsgraph_get()
+            l, h = world_bbox(meshes, dg)
+            lo = l if lo is None else Vector(map(min, lo, l))
+            hi = h if hi is None else Vector(map(max, hi, h))
+        sc.frame_set(frames[0])
+    else:
+        sc.frame_set(frames[0] if not wobble else sc.frame_current)
+        lo, hi = world_bbox(meshes, dg)
     center = (lo+hi)/2; size = hi-lo
     height = size.z
     width_xy = max(size.x, size.y)  # worst-case horizontal extent across any azimuth
@@ -93,7 +112,7 @@ for unit in cfg["units"]:
     dist_for_width = (width_xy/fill_frac/2) / math.tan(fov_h/2)
     dist = max(dist_for_height, dist_for_width)
 
-    elev = math.radians(10)
+    elev = math.radians(unit.get("elev_deg", 10))
     cx = center.x + dist*math.cos(elev)*math.sin(az)
     cy = center.y - dist*math.cos(elev)*math.cos(az)
     cz = center.z + dist*math.sin(elev)
@@ -101,8 +120,19 @@ for unit in cfg["units"]:
     direction = center - cam.location
     cam.rotation_euler = direction.to_track_quat('-Z', 'Y').to_euler()
 
+    roots = [o for o in sc.objects if o.parent is None and o.type in ('MESH','ARMATURE','EMPTY')]
+    base_state = [(o, o.rotation_euler.copy(), o.location.copy()) for o in roots]
     for i, f in enumerate(frames):
-        sc.frame_set(f)
+        if wobble:
+            ph = 2*math.pi*i/nframes
+            pitch = math.radians(wobble.get("pitch", 0))*math.sin(ph)
+            roll = math.radians(wobble.get("roll", 0))*math.cos(ph)
+            bob = wobble.get("bob", 0)*height*math.sin(2*ph)
+            for o, rot, loc in base_state:
+                o.rotation_euler = (rot.x + pitch, rot.y + roll, rot.z)
+                o.location = (loc.x, loc.y, loc.z + bob)
+        else:
+            sc.frame_set(f)
         sc.render.filepath = os.path.join(OUT, f"{name}_{i}.png")
         bpy.ops.render.render(write_still=True)
         log("wrote", sc.render.filepath)

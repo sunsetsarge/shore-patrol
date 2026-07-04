@@ -86,9 +86,13 @@ function collectSpritePaths(data) {
   paths.add('assets/background.png');
   for (const e of data.enemies.enemies) {
     addSpritePaths(paths, e.sprite);
+    addSpritePaths(paths, e.deathSprite);
   }
   for (const c of data.crates.crates) {
     addSpritePaths(paths, c.sprite);
+  }
+  for (const w of data.weapons.weapons) {
+    addSpritePaths(paths, w.turretSprite);
   }
   return [...paths];
 }

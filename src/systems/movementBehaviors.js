@@ -72,7 +72,7 @@ export const movementBehaviors = {
 
   land_then_disgorge(entity, dt, api) {
     const speed = entity.type.speed * api.difficulty.speed;
-    const landD = 0.45;
+    const landD = 0.10;
     if (!entity.flags.landed) {
       entity.d -= speed * dt;
       if (entity.d <= landD) {
@@ -83,12 +83,11 @@ export const movementBehaviors = {
     } else {
       entity.flags.pauseTimer += dt;
       if (entity.flags.pauseTimer >= 1.0) {
-        // self-disgorge: despawn without score, but still spawn children
+        // self-disgorge: despawn without score. spawnSystem fires
+        // spawnsOnDeath generically off flags.landed (set above), never for
+        // player kills.
         entity.dead = true;
         entity.suppressScore = true;
-        if (entity.type.spawnsOnDeath) {
-          api.spawnChildren(entity, entity.type.spawnsOnDeath);
-        }
       }
     }
   },

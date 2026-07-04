@@ -96,7 +96,9 @@ export function update(game, dt) {
   }
 
   const allSpawned = waveDef.spawns.every((s, i) => ws.spawnProgress[i].spawned >= s.count);
-  const cleared = allSpawned && game.entities.filter(e => !e.dead).length === 0;
+  // Dying entities (playing a one-shot death animation) are excluded from the
+  // cleared count — a lingering corpse must not block wave progression.
+  const cleared = allSpawned && game.entities.filter(e => !e.dead && !e.dying).length === 0;
   const timeUp = ws.timeInWave >= waveDef.duration;
 
   if (cleared || timeUp) {

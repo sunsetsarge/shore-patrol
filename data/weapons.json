@@ -10,10 +10,17 @@
       "splashRadius": 0,
       "ammo": 400,
       "projectileSpeed": null,
-      "targetDomains": ["land", "sea", "air", "crate"],
+      "targetDomains": [
+        "land",
+        "sea",
+        "air",
+        "crate"
+      ],
       "sound": "rapidFire",
       "color": "#ffd24a",
-      "reticle": "cross"
+      "reticle": "cross",
+      "turretSprite": "assets/turret/wpn_mg.png",
+      "turretScale": 1.0
     },
     {
       "id": "howitzer",
@@ -25,10 +32,17 @@
       "splashRadius": 120,
       "ammo": 12,
       "projectileSpeed": 1.6,
-      "targetDomains": ["land", "sea", "air", "crate"],
+      "targetDomains": [
+        "land",
+        "sea",
+        "air",
+        "crate"
+      ],
       "sound": "heavyBoom",
       "color": "#ff6a3a",
-      "reticle": "circle"
+      "reticle": "circle",
+      "turretSprite": "assets/turret/wpn_howitzer.png",
+      "turretScale": 1.0
     },
     {
       "id": "sam",
@@ -40,10 +54,14 @@
       "splashRadius": 0,
       "ammo": 8,
       "projectileSpeed": 2.2,
-      "targetDomains": ["air"],
+      "targetDomains": [
+        "air"
+      ],
       "sound": "lockTone",
       "color": "#5ad1ff",
-      "reticle": "diamond"
+      "reticle": "diamond",
+      "turretSprite": "assets/turret/wpn_sam.png",
+      "turretScale": 1.0
     },
     {
       "id": "pistol",
@@ -55,10 +73,17 @@
       "splashRadius": 0,
       "ammo": null,
       "projectileSpeed": null,
-      "targetDomains": ["land", "sea", "air", "crate"],
+      "targetDomains": [
+        "land",
+        "sea",
+        "air",
+        "crate"
+      ],
       "sound": "lightShot",
       "color": "#e0e0e0",
-      "reticle": "cross"
+      "reticle": "cross",
+      "turretSprite": "assets/turret/wpn_pistol.png",
+      "turretScale": 1.0
     }
   ]
 }

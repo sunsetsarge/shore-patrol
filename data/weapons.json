@@ -1,0 +1,64 @@
+{
+  "weapons": [
+    {
+      "id": "mg",
+      "name": "Twin .50 Cal",
+      "key": "1",
+      "fireMode": "auto",
+      "fireRate": 10,
+      "damage": 4,
+      "splashRadius": 0,
+      "ammo": 400,
+      "projectileSpeed": null,
+      "targetDomains": ["land", "sea", "air", "crate"],
+      "sound": "rapidFire",
+      "color": "#ffd24a",
+      "reticle": "cross"
+    },
+    {
+      "id": "howitzer",
+      "name": "Howitzer",
+      "key": "2",
+      "fireMode": "single",
+      "fireRate": 0.8,
+      "damage": 60,
+      "splashRadius": 120,
+      "ammo": 12,
+      "projectileSpeed": 1.6,
+      "targetDomains": ["land", "sea", "air", "crate"],
+      "sound": "heavyBoom",
+      "color": "#ff6a3a",
+      "reticle": "circle"
+    },
+    {
+      "id": "sam",
+      "name": "SAM Launcher",
+      "key": "3",
+      "fireMode": "guided",
+      "fireRate": 1,
+      "damage": 80,
+      "splashRadius": 0,
+      "ammo": 8,
+      "projectileSpeed": 2.2,
+      "targetDomains": ["air"],
+      "sound": "lockTone",
+      "color": "#5ad1ff",
+      "reticle": "diamond"
+    },
+    {
+      "id": "pistol",
+      "name": "Sidearm",
+      "key": "4",
+      "fireMode": "single",
+      "fireRate": 4,
+      "damage": 2,
+      "splashRadius": 0,
+      "ammo": null,
+      "projectileSpeed": null,
+      "targetDomains": ["land", "sea", "air", "crate"],
+      "sound": "lightShot",
+      "color": "#e0e0e0",
+      "reticle": "cross"
+    }
+  ]
+}

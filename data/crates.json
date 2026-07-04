@@ -1,0 +1,7 @@
+{
+  "crates": [
+    {"id": "mg_crate", "weaponId": "mg", "amount": 200, "dropSpeed": 0.055, "spawnWeight": 3, "color": "#e8c832"},
+    {"id": "howitzer_crate", "weaponId": "howitzer", "amount": 6, "dropSpeed": 0.055, "spawnWeight": 1, "color": "#e8c832"},
+    {"id": "sam_crate", "weaponId": "sam", "amount": 4, "dropSpeed": 0.055, "spawnWeight": 1, "color": "#e8c832"}
+  ]
+}

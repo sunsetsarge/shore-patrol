@@ -1,0 +1,14 @@
+{
+  "out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_test2",
+  "res": 768,
+  "units": [
+    {"name": "inf_az0", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/walking.glb", "frames": 1, "azimuth_deg": 0},
+    {"name": "inf_az90", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/walking.glb", "frames": 1, "azimuth_deg": 90},
+    {"name": "inf_az180", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/walking.glb", "frames": 1, "azimuth_deg": 180},
+    {"name": "inf_az270", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/walking.glb", "frames": 1, "azimuth_deg": 270},
+    {"name": "com_az0", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/commando_walking.glb", "frames": 1, "azimuth_deg": 0},
+    {"name": "com_az90", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/commando_walking.glb", "frames": 1, "azimuth_deg": 90},
+    {"name": "com_az180", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/commando_walking.glb", "frames": 1, "azimuth_deg": 180},
+    {"name": "com_az270", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/commando_walking.glb", "frames": 1, "azimuth_deg": 270}
+  ]
+}

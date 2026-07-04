@@ -68,14 +68,27 @@ function validateData(data) {
 // Collect every distinct `sprite` path referenced anywhere in the loaded
 // data (enemies, crates), plus the optional background convention path.
 // Tolerates absence of the field entirely (that's today's baseline state).
+// `sprite` may be a single path string (static) OR an array of path strings
+// (animation frames) — collect every member in the array case.
+function addSpritePaths(paths, sprite) {
+  if (!sprite) return;
+  if (Array.isArray(sprite)) {
+    for (const p of sprite) {
+      if (p) paths.add(p);
+    }
+  } else {
+    paths.add(sprite);
+  }
+}
+
 function collectSpritePaths(data) {
   const paths = new Set();
   paths.add('assets/background.png');
   for (const e of data.enemies.enemies) {
-    if (e.sprite) paths.add(e.sprite);
+    addSpritePaths(paths, e.sprite);
   }
   for (const c of data.crates.crates) {
-    if (c.sprite) paths.add(c.sprite);
+    addSpritePaths(paths, c.sprite);
   }
   return [...paths];
 }
@@ -148,7 +161,7 @@ function renderPlaying(ctx, game) {
   for (const e of drawList) {
     if (e.kind === 'crate') {
       const { sx, sy, scale } = Renderer.project(e.x, 0, e.alt, 'air');
-      Renderer.drawCrate(ctx, sx, sy, scale, e.type.color, e.type);
+      Renderer.drawCrate(ctx, sx, sy, scale, e.type.color, e.type, e.age);
     } else {
       const domain = e.type.domain;
       const { sx, sy, scale } = Renderer.project(e.x, e.d, e.alt, domain);

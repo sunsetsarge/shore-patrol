@@ -1,0 +1,36 @@
+{
+ "out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders",
+ "res": 768,
+ "units": [
+  {
+   "name": "infantry",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/walking.glb",
+   "frames": 8,
+   "azimuth_deg": 0
+  },
+  {
+   "name": "commando",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/commando_walking.glb",
+   "frames": 8,
+   "azimuth_deg": 0
+  },
+  {
+   "name": "tank",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/tank.glb",
+   "frames": 1,
+   "azimuth_deg": -60
+  },
+  {
+   "name": "landing_craft",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb",
+   "frames": 1,
+   "azimuth_deg": -60
+  },
+  {
+   "name": "helicopter",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/helicopter.glb",
+   "frames": 1,
+   "azimuth_deg": -65
+  }
+ ]
+}

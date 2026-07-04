@@ -4,11 +4,30 @@
 // per SPEC (land/sea/air), not per specific enemy.
 //
 // Optional data-driven sprite rendering: entity/crate defs may carry a
-// `sprite` (path) + `spriteScale` (number) field. When present AND the image
-// is fully loaded (per sprites.js), the sprite is drawn instead of the
-// vector glyph. Missing/failed/not-yet-loaded sprite => vector glyph
-// fallback, so the game renders identically to today when no `sprite`
-// fields exist anywhere in the data.
+// `sprite` (path, OR an array of paths for an animation frame sequence) +
+// `spriteScale` (number) field. When present AND the image is fully loaded
+// (per sprites.js), the sprite is drawn instead of the vector glyph.
+// Missing/failed/not-yet-loaded sprite => vector glyph fallback, so the game
+// renders identically to today when no `sprite` fields exist anywhere in
+// the data.
+//
+// Animation: if `sprite` is an array, the current frame index is
+// floor(entity.age * spriteFps) % frames.length (spriteFps defaults to 8).
+// If that specific frame isn't loaded yet, fall back to the vector glyph —
+// no partial-frame/hold-last-frame cleverness.
+
+const DEFAULT_SPRITE_FPS = 8;
+
+// resolveSpritePath(sprite, spriteFps, age) -> path string or null.
+// sprite may be a static path string or an array of frame path strings.
+function resolveSpritePath(sprite, spriteFps, age) {
+  if (!sprite) return null;
+  if (!Array.isArray(sprite)) return sprite;
+  if (sprite.length === 0) return null;
+  const fps = spriteFps || DEFAULT_SPRITE_FPS;
+  const idx = Math.floor((age || 0) * fps) % sprite.length;
+  return sprite[idx];
+}
 
 import * as Sprites from './sprites.js';
 
@@ -133,7 +152,8 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
   const shape = type.shape;
   const color = type.color || '#ffffff';
 
-  const img = type.sprite ? Sprites.get(type.sprite) : null;
+  const spritePath = resolveSpritePath(type.sprite, type.spriteFps, entity.age);
+  const img = spritePath ? Sprites.get(spritePath) : null;
   if (img) {
     const spriteScale = type.spriteScale || 1.0;
     const domain = type.domain;
@@ -357,9 +377,10 @@ export function drawProjectile(ctx, sx, sy, color, size = 5) {
   ctx.restore();
 }
 
-export function drawCrate(ctx, sx, sy, scale, color, crateType) {
+export function drawCrate(ctx, sx, sy, scale, color, crateType, age) {
   const sprite = crateType && crateType.sprite;
-  const img = sprite ? Sprites.get(sprite) : null;
+  const spritePath = resolveSpritePath(sprite, crateType && crateType.spriteFps, age);
+  const img = spritePath ? Sprites.get(spritePath) : null;
   if (img) {
     const spriteScale = (crateType && crateType.spriteScale) || 1.0;
     const drawH = 90 * scale * spriteScale;

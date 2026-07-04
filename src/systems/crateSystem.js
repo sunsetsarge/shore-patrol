@@ -56,6 +56,7 @@ export function update(game, dt) {
       continue;
     }
     if (c.dead) continue;
+    c.age += dt;
     c.alt -= c.type.dropSpeed * dt;
     if (c.alt <= 0) {
       c.alt = 0;

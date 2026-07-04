@@ -1,0 +1,8 @@
+{
+  "out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_test2",
+  "res": 768,
+  "units": [
+    {"name": "tank_fchk", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/tank.glb", "frames": 1, "azimuth_deg": 45},
+    {"name": "inf_fchk", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/walking.glb", "frames": 1, "azimuth_deg": 0}
+  ]
+}

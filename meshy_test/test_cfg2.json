@@ -1,0 +1,9 @@
+{
+  "out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_test2",
+  "res": 768,
+  "units": [
+    {"name": "lc_az270", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb", "frames": 1, "azimuth_deg": 270},
+    {"name": "lc_az315", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb", "frames": 1, "azimuth_deg": 315},
+    {"name": "lc_az300", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb", "frames": 1, "azimuth_deg": 300}
+  ]
+}

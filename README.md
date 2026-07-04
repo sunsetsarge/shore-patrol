@@ -179,10 +179,10 @@ contains. Once you have 6 waves, wave 6 becomes the new "final wave" that
 loops (at x1.15 difficulty per loop) once the array is exhausted. **No other
 file changes.**
 
-### Optional sprite art — `sprite` / `spriteScale` fields + `assets/background.png`
+### Optional sprite art — `sprite` / `spriteScale` / `spriteFps` fields + `assets/background.png`
 
 Any enemy def (`data/enemies.json`) or crate def (`data/crates.json`) may carry
-two optional fields:
+these optional fields:
 
 ```json
 "sprite": "assets/infantry.png",
@@ -205,6 +205,44 @@ breaks, and you never need a placeholder image to keep the game running.
 **Dropping a PNG into `assets/` + adding one `sprite` field to a JSON entry
 reskins that enemy or crate.** Delete the field (or rename/remove the file)
 to go back to vector art — no other change needed.
+
+#### Animated sprites — `sprite` as a frame array
+
+`sprite` may instead be an **array** of path strings — one per animation
+frame — with an optional sibling field:
+
+```json
+"sprite": [
+  "assets/frames/infantry_0.png",
+  "assets/frames/infantry_1.png",
+  "assets/frames/infantry_2.png",
+  "assets/frames/infantry_3.png",
+  "assets/frames/infantry_4.png",
+  "assets/frames/infantry_5.png",
+  "assets/frames/infantry_6.png",
+  "assets/frames/infantry_7.png"
+],
+"spriteFps": 8
+```
+
+- `spriteFps` is optional and defaults to `8` if omitted.
+- The frame shown at any moment is `floor(entity.age * spriteFps) % frames.length`
+  — `age` is how long that entity has existed (seconds), so the animation
+  loops continuously for as long as the entity is alive.
+- Every path in the array is preloaded the same way static sprite paths are.
+  The fallback rule is unchanged and applies per-frame: if the *current*
+  frame's image hasn't finished loading (or fails to load), that draw call
+  falls back to the vector glyph for that instant — there's no
+  hold-the-last-good-frame logic, just the same simple present/loaded check
+  used for static sprites.
+- A plain string still works exactly as before (static, non-animated) — you
+  do not need to convert every existing `sprite` field to a single-element
+  array.
+
+**Turning a static reskin into a walk-cycle animation is still pure JSON:**
+drop the frame PNGs into `assets/frames/`, replace the single `sprite` string
+with the array of frame paths, optionally set `spriteFps`. No `.js` file
+changes required.
 
 There's also a background-image convention: if `assets/background.png`
 exists, it's drawn stretched to fill the full 1280x720 canvas in place of the

@@ -1,0 +1,16 @@
+{
+  "out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_test2",
+  "res": 768,
+  "units": [
+    {"name": "tank_az0", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/tank.glb", "frames": 1, "azimuth_deg": 0},
+    {"name": "tank_az45", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/tank.glb", "frames": 1, "azimuth_deg": 45},
+    {"name": "lc_az0", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb", "frames": 1, "azimuth_deg": 0},
+    {"name": "lc_az45", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb", "frames": 1, "azimuth_deg": 45},
+    {"name": "lc_az135", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb", "frames": 1, "azimuth_deg": 135},
+    {"name": "lc_az225", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/landing_craft.glb", "frames": 1, "azimuth_deg": 225},
+    {"name": "heli_az0", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/helicopter.glb", "frames": 1, "azimuth_deg": 0},
+    {"name": "heli_az45", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/helicopter.glb", "frames": 1, "azimuth_deg": 45},
+    {"name": "heli_az135", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/helicopter.glb", "frames": 1, "azimuth_deg": 135},
+    {"name": "heli_az225", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/helicopter.glb", "frames": 1, "azimuth_deg": 225}
+  ]
+}

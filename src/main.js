@@ -1,6 +1,7 @@
 import { createInputState, attachInput, drainQueue } from './engine/input.js';
 import * as Turret from './engine/turret.js';
 import * as Renderer from './engine/renderer.js';
+import * as Sprites from './engine/sprites.js';
 import { createAudio } from './audio.js';
 
 import * as SpawnSystem from './systems/spawnSystem.js';
@@ -62,6 +63,21 @@ function validateData(data) {
   data.weapons.weapons = validWeapons;
 
   return data;
+}
+
+// Collect every distinct `sprite` path referenced anywhere in the loaded
+// data (enemies, crates), plus the optional background convention path.
+// Tolerates absence of the field entirely (that's today's baseline state).
+function collectSpritePaths(data) {
+  const paths = new Set();
+  paths.add('assets/background.png');
+  for (const e of data.enemies.enemies) {
+    if (e.sprite) paths.add(e.sprite);
+  }
+  for (const c of data.crates.crates) {
+    if (c.sprite) paths.add(c.sprite);
+  }
+  return [...paths];
 }
 
 function createGame(canvas, ctx, data, audio) {
@@ -132,7 +148,7 @@ function renderPlaying(ctx, game) {
   for (const e of drawList) {
     if (e.kind === 'crate') {
       const { sx, sy, scale } = Renderer.project(e.x, 0, e.alt, 'air');
-      Renderer.drawCrate(ctx, sx, sy, scale, e.type.color);
+      Renderer.drawCrate(ctx, sx, sy, scale, e.type.color, e.type);
     } else {
       const domain = e.type.domain;
       const { sx, sy, scale } = Renderer.project(e.x, e.d, e.alt, domain);
@@ -241,6 +257,10 @@ async function main() {
     ctx.fillText('Failed to load game data — see console.', 40, 40);
     return;
   }
+
+  // Kick off sprite preloading (fire-and-forget — the game starts immediately
+  // and sprites pop in via the renderer's loaded-image fallback logic).
+  Sprites.preload(collectSpritePaths(data));
 
   const audio = createAudio();
   const game = createGame(canvas, ctx, data, audio);

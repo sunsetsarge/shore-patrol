@@ -15,7 +15,9 @@
       "spawnsOnDeath": null,
       "color": "#7a8b3a",
       "shape": "biped",
-      "behaviorScript": null
+      "behaviorScript": null,
+      "sprite": "assets/infantry.png",
+      "spriteScale": 1.4
     },
     {
       "id": "tank",
@@ -32,7 +34,9 @@
       "spawnsOnDeath": null,
       "color": "#5c6b2e",
       "shape": "tank",
-      "behaviorScript": null
+      "behaviorScript": null,
+      "sprite": "assets/tank.png",
+      "spriteScale": 1.3
     },
     {
       "id": "landing_craft",
@@ -46,10 +50,16 @@
       "damageToBase": 0,
       "fireDamage": 0,
       "fireInterval": 0,
-      "spawnsOnDeath": {"enemyId": "infantry", "count": 4, "spread": 0.12},
+      "spawnsOnDeath": {
+        "enemyId": "infantry",
+        "count": 4,
+        "spread": 0.12
+      },
       "color": "#3a4a5c",
       "shape": "boat",
-      "behaviorScript": null
+      "behaviorScript": null,
+      "sprite": "assets/landing_craft.png",
+      "spriteScale": 1.4
     },
     {
       "id": "helicopter",
@@ -66,7 +76,9 @@
       "spawnsOnDeath": null,
       "color": "#4a4a4a",
       "shape": "heli",
-      "behaviorScript": null
+      "behaviorScript": null,
+      "sprite": "assets/helicopter.png",
+      "spriteScale": 1.5
     },
     {
       "id": "commando",
@@ -83,7 +95,9 @@
       "spawnsOnDeath": null,
       "color": "#8b6a3a",
       "shape": "biped",
-      "behaviorScript": null
+      "behaviorScript": null,
+      "sprite": "assets/commando.png",
+      "spriteScale": 1.4
     }
   ]
 }

@@ -179,6 +179,44 @@ contains. Once you have 6 waves, wave 6 becomes the new "final wave" that
 loops (at x1.15 difficulty per loop) once the array is exhausted. **No other
 file changes.**
 
+### Optional sprite art — `sprite` / `spriteScale` fields + `assets/background.png`
+
+Any enemy def (`data/enemies.json`) or crate def (`data/crates.json`) may carry
+two optional fields:
+
+```json
+"sprite": "assets/infantry.png",
+"spriteScale": 1.0
+```
+
+- `sprite` is a path **relative to the repo root** pointing at a PNG. Drop the
+  image file into `assets/` (or anywhere else under the repo) and reference it
+  here.
+- `spriteScale` is an optional multiplier on the sprite's rendered size
+  (defaults to `1.0` if omitted).
+
+When a `sprite` path is present **and the image has finished loading**, the
+renderer draws that image instead of the vector glyph — bottom-anchored for
+land/sea enemies and crates, center-anchored for air enemies. If the field is
+absent, the image fails to load, or it simply hasn't finished loading yet,
+the game falls back to the existing vector glyph automatically — nothing
+breaks, and you never need a placeholder image to keep the game running.
+
+**Dropping a PNG into `assets/` + adding one `sprite` field to a JSON entry
+reskins that enemy or crate.** Delete the field (or rename/remove the file)
+to go back to vector art — no other change needed.
+
+There's also a background-image convention: if `assets/background.png`
+exists, it's drawn stretched to fill the full 1280x720 canvas in place of the
+procedural sky/sea/beach art (the animated waterline shimmer still plays on
+top). This path is fixed by convention, not a data field — just add or
+remove the file.
+
+None of this requires touching engine code: it's handled generically by
+`src/engine/sprites.js` (a tiny loader/registry) and a few lines in
+`renderer.js` that check `type.sprite` — the same modularity contract as
+everything else in this project.
+
 ### The rule this all follows
 
 Adding *content* (a new id in a JSON array, using behaviors/fire-modes that

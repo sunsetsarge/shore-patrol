@@ -2,6 +2,15 @@
 // enemy/weapon id branching. Shapes come from data (enemy.shape), colors from
 // data (enemy.color / weapon.color), domain-based background bands are fixed
 // per SPEC (land/sea/air), not per specific enemy.
+//
+// Optional data-driven sprite rendering: entity/crate defs may carry a
+// `sprite` (path) + `spriteScale` (number) field. When present AND the image
+// is fully loaded (per sprites.js), the sprite is drawn instead of the
+// vector glyph. Missing/failed/not-yet-loaded sprite => vector glyph
+// fallback, so the game renders identically to today when no `sprite`
+// fields exist anywhere in the data.
+
+import * as Sprites from './sprites.js';
 
 const CANVAS_W = 1280;
 const CANVAS_H = 720;
@@ -120,19 +129,37 @@ const glyphRegistry = {
 };
 
 export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
-  const shape = entity.type && entity.type.shape;
-  const color = (entity.type && entity.type.color) || '#ffffff';
-  const fn = glyphRegistry[shape];
-  if (fn) {
-    fn(ctx, sx, sy, scale, color, entity);
+  const type = entity.type || {};
+  const shape = type.shape;
+  const color = type.color || '#ffffff';
+
+  const img = type.sprite ? Sprites.get(type.sprite) : null;
+  if (img) {
+    const spriteScale = type.spriteScale || 1.0;
+    const domain = type.domain;
+    const drawH = (type.hitbox || 26) * 2.4 * scale * spriteScale;
+    const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+    if (domain === 'air') {
+      // center-anchored at (sx, sy)
+      ctx.drawImage(img, sx - drawW / 2, sy - drawH / 2, drawW, drawH);
+    } else {
+      // bottom-anchored at (sx, sy) for land/sea domains
+      ctx.drawImage(img, sx - drawW / 2, sy - drawH, drawW, drawH);
+    }
   } else {
-    // fallback glyph for unknown shapes — still domain-agnostic, no crash
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(sx, sy, 20 * scale, 0, Math.PI * 2);
-    ctx.fill();
+    const fn = glyphRegistry[shape];
+    if (fn) {
+      fn(ctx, sx, sy, scale, color, entity);
+    } else {
+      // fallback glyph for unknown shapes — still domain-agnostic, no crash
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 20 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
-  // simple hp bar above entity if damaged
+
+  // simple hp bar above entity if damaged (kept working regardless of sprite/glyph)
   if (entity.maxHp > 0 && entity.hp < entity.maxHp) {
     const w = 40 * scale;
     const h = 4;
@@ -145,7 +172,30 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
 }
 
 // -------------------- background --------------------
+const BACKGROUND_SPRITE = 'assets/background.png';
+
 export function drawBackground(ctx, t) {
+  const bgImg = Sprites.get(BACKGROUND_SPRITE);
+  if (bgImg) {
+    ctx.drawImage(bgImg, 0, 0, CANVAS_W, CANVAS_H);
+    // Keep the animated waterline shimmer overlay even with the background
+    // image in place — everything else (procedural sky/sea/beach fills) is
+    // skipped since the image already covers the full canvas.
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) {
+      const y = HORIZON_Y + (i + 1) * ((SEA_Y - HORIZON_Y) / 9);
+      const offset = Math.sin(t * 1.2 + i) * 6;
+      ctx.beginPath();
+      ctx.moveTo(0, y + offset);
+      for (let x = 0; x <= CANVAS_W; x += 40) {
+        ctx.lineTo(x, y + Math.sin(t * 1.5 + x * 0.02 + i) * 3);
+      }
+      ctx.stroke();
+    }
+    return;
+  }
+
   // sky
   const skyGrad = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
   skyGrad.addColorStop(0, '#0a0e1a');
@@ -307,7 +357,17 @@ export function drawProjectile(ctx, sx, sy, color, size = 5) {
   ctx.restore();
 }
 
-export function drawCrate(ctx, sx, sy, scale, color) {
+export function drawCrate(ctx, sx, sy, scale, color, crateType) {
+  const sprite = crateType && crateType.sprite;
+  const img = sprite ? Sprites.get(sprite) : null;
+  if (img) {
+    const spriteScale = (crateType && crateType.spriteScale) || 1.0;
+    const drawH = 90 * scale * spriteScale;
+    const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+    // bottom-anchored at (sx, sy)
+    ctx.drawImage(img, sx - drawW / 2, sy - drawH, drawW, drawH);
+    return;
+  }
   const s = 30 * scale;
   // parachute
   ctx.strokeStyle = '#ffffff';

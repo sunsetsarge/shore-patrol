@@ -10,9 +10,9 @@
       },
       "spawns": [
         {
-          "enemyId": "infantry",
-          "count": 8,
-          "interval": 3.5,
+          "enemyId": "landing_craft",
+          "count": 2,
+          "interval": 16,
           "startDelay": 2
         }
       ],
@@ -34,16 +34,10 @@
       },
       "spawns": [
         {
-          "enemyId": "infantry",
-          "count": 8,
-          "interval": 3,
-          "startDelay": 1
-        },
-        {
           "enemyId": "landing_craft",
-          "count": 3,
-          "interval": 12,
-          "startDelay": 6
+          "count": 4,
+          "interval": 11,
+          "startDelay": 2
         }
       ],
       "crates": {
@@ -65,21 +59,15 @@
       },
       "spawns": [
         {
-          "enemyId": "infantry",
-          "count": 6,
-          "interval": 3,
-          "startDelay": 1
-        },
-        {
           "enemyId": "tank",
           "count": 4,
           "interval": 9,
           "startDelay": 4
         },
         {
-          "enemyId": "commando",
-          "count": 5,
-          "interval": 5,
+          "enemyId": "commando_craft",
+          "count": 2,
+          "interval": 15,
           "startDelay": 3
         }
       ],
@@ -101,12 +89,6 @@
         "speed": 1.1
       },
       "spawns": [
-        {
-          "enemyId": "infantry",
-          "count": 6,
-          "interval": 2.5,
-          "startDelay": 1
-        },
         {
           "enemyId": "landing_craft",
           "count": 3,
@@ -139,28 +121,22 @@
       },
       "spawns": [
         {
-          "enemyId": "infantry",
-          "count": 10,
-          "interval": 2,
-          "startDelay": 1
+          "enemyId": "landing_craft",
+          "count": 4,
+          "interval": 8,
+          "startDelay": 2
+        },
+        {
+          "enemyId": "commando_craft",
+          "count": 2,
+          "interval": 14,
+          "startDelay": 6
         },
         {
           "enemyId": "tank",
           "count": 4,
           "interval": 7,
           "startDelay": 3
-        },
-        {
-          "enemyId": "commando",
-          "count": 6,
-          "interval": 4,
-          "startDelay": 2
-        },
-        {
-          "enemyId": "landing_craft",
-          "count": 4,
-          "interval": 8,
-          "startDelay": 4
         },
         {
           "enemyId": "helicopter",

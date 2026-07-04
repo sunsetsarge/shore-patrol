@@ -67,6 +67,10 @@ export function attachInput(canvas, inputState, onFirstGesture) {
       inputState.queue.push({ type: 'cycleWeapon', dir: 1 });
     } else if (e.key === 'Enter' || e.key === ' ') {
       inputState.queue.push({ type: 'confirm' });
+    } else if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+      inputState.queue.push({ type: 'pause' });
+    } else if (e.key === 'm' || e.key === 'M') {
+      inputState.queue.push({ type: 'menu' });
     }
   });
 

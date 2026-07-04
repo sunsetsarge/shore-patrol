@@ -1,0 +1,1 @@
+{"out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_p3", "res": 768, "units": [{"name": "infantry", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/infantry_combatwalk.glb", "frames": 8, "azimuth_deg": 270}, {"name": "commando", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/commando_combatwalk.glb", "frames": 8, "azimuth_deg": 270}]}

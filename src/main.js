@@ -105,7 +105,7 @@ function createGame(canvas, ctx, data, audio) {
     audio,
     input: createInputState(),
     defense: 100,
-    state: 'menu', // menu | playing | gameover
+    state: 'menu', // menu | playing | paused | gameover
     time: 0,
   };
   return game;
@@ -134,8 +134,16 @@ function update(game, dt) {
 
   const events = drainQueue(game.input);
   for (const evt of events) {
+    if (evt.type === 'pause') {
+      game.state = 'paused';
+      continue;
+    }
+    // 'menu' does nothing during active play — no accidental quits.
+    if (evt.type === 'menu') continue;
     WeaponSystem.handleInputEvent(game, evt);
   }
+
+  if (game.state !== 'playing') return;
 
   WeaponSystem.update(game, dt);
   SpawnSystem.update(game, dt);
@@ -226,6 +234,24 @@ function renderMenu(ctx, game) {
   ctx.restore();
 }
 
+function renderPaused(ctx, game) {
+  renderPlaying(ctx, game);
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, 1280, 720);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffd24a';
+  ctx.font = 'bold 64px monospace';
+  ctx.fillText('PAUSED', 640, 320);
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px monospace';
+  ctx.fillText('ESC / P — resume', 640, 380);
+  ctx.fillStyle = '#ccc';
+  ctx.font = '16px monospace';
+  ctx.fillText('M — return to menu', 640, 415);
+  ctx.restore();
+}
+
 function renderGameover(ctx, game) {
   renderPlaying(ctx, game);
   ctx.save();
@@ -254,6 +280,8 @@ function render(game) {
     renderMenu(ctx, game);
   } else if (game.state === 'playing') {
     renderPlaying(ctx, game);
+  } else if (game.state === 'paused') {
+    renderPaused(ctx, game);
   } else if (game.state === 'gameover') {
     renderGameover(ctx, game);
   }
@@ -298,11 +326,25 @@ async function main() {
     }
   }
 
+  // Processes input while paused: ESC/P resumes, M returns to the menu.
+  // No update ticks happen here — the scene stays frozen.
+  function handlePausedInput() {
+    const events = drainQueue(game.input);
+    for (const evt of events) {
+      if (evt.type === 'pause') {
+        game.state = 'playing';
+      } else if (evt.type === 'menu') {
+        game.state = 'menu';
+      }
+    }
+  }
+
   // Deterministic single-step driver for headless/hidden-tab testing:
-  // steps N fixed updates (or menu input handling) then renders once.
+  // steps N fixed updates (or menu/paused input handling) then renders once.
   game.debugStep = (steps = 1) => {
     for (let i = 0; i < steps; i++) {
       if (game.state === 'playing') update(game, FIXED_DT);
+      else if (game.state === 'paused') handlePausedInput();
       else handleMenuOrGameoverInput();
     }
     render(game);
@@ -324,6 +366,11 @@ async function main() {
         update(game, FIXED_DT);
         accumulator -= FIXED_DT;
       }
+    } else if (game.state === 'paused') {
+      handlePausedInput();
+      // scene stays frozen; discard accumulated time so resume doesn't
+      // burst-run catch-up ticks
+      accumulator = 0;
     } else {
       handleMenuOrGameoverInput();
       // still tick turret aim for reticle visuals on menu/gameover

@@ -154,6 +154,35 @@
         "assets/frames/commando_death_5.png"
       ],
       "deathFps": 10
+    },
+    {
+      "id": "commando_craft",
+      "name": "Commando Craft",
+      "domain": "sea",
+      "hp": 90,
+      "speed": 0.03,
+      "movement": "land_then_disgorge",
+      "hitbox": 46,
+      "scoreValue": 300,
+      "damageToBase": 0,
+      "fireDamage": 0,
+      "fireInterval": 0,
+      "spawnsOnDeath": {
+        "enemyId": "commando",
+        "count": 3,
+        "spread": 0.12
+      },
+      "color": "#3a4a5c",
+      "shape": "boat",
+      "behaviorScript": null,
+      "sprite": [
+        "assets/frames/landing_craft_0.png",
+        "assets/frames/landing_craft_1.png",
+        "assets/frames/landing_craft_2.png",
+        "assets/frames/landing_craft_3.png"
+      ],
+      "spriteScale": 1.4,
+      "spriteFps": 6
     }
   ]
 }

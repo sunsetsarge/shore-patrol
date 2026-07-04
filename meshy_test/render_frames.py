@@ -120,19 +120,71 @@ for unit in cfg["units"]:
     direction = center - cam.location
     cam.rotation_euler = direction.to_track_quat('-Z', 'Y').to_euler()
 
+    # Rifle prop spanning both hands (Meshy t-pose models are empty-handed).
+    rifle = None; arm_obj = None
+    if unit.get("attach_rifle"):
+        arm_obj = next((o for o in sc.objects if o.type == 'ARMATURE'), None)
+        L = height * 0.62
+        bpy.ops.mesh.primitive_cube_add(size=1); b = bpy.context.active_object
+        b.scale = (L*0.030, L*0.46, L*0.045); parts = [b]
+        bpy.ops.mesh.primitive_cylinder_add(radius=L*0.016, depth=L*0.42); c = bpy.context.active_object
+        c.rotation_euler = (math.radians(90), 0, 0); c.location = (0, L*0.62, L*0.008); parts.append(c)
+        bpy.ops.mesh.primitive_cube_add(size=1); st = bpy.context.active_object
+        st.scale = (L*0.032, L*0.16, L*0.06); st.location = (0, -L*0.52, -L*0.02); parts.append(st)
+        for p in parts: p.select_set(True)
+        bpy.context.view_layer.objects.active = parts[0]
+        bpy.ops.object.join()
+        rifle = bpy.context.active_object; rifle.name = "rifle_prop"
+        # bake part scales into the mesh so matrix_world placement (scale=1)
+        # renders at true size
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        mat = bpy.data.materials.new("gunmetal"); mat.use_nodes = True
+        bsdf = mat.node_tree.nodes["Principled BSDF"]
+        bsdf.inputs["Base Color"].default_value = (0.04, 0.04, 0.05, 1)
+        bsdf.inputs["Roughness"].default_value = 0.55
+        rifle.data.materials.append(mat)
+
+    def place_rifle():
+        if not (rifle and arm_obj): return
+        dgx = bpy.context.evaluated_depsgraph_get()
+        armE = arm_obj.evaluated_get(dgx)
+        rh = (arm_obj.matrix_world @ armE.pose.bones['RightHand'].matrix).translation
+        # rifle aims along the character's facing (-Y for these rigs) with a
+        # slight upward tilt, anchored at the trigger (right) hand; the grip
+        # line between hands is diagonal and NOT the aim axis.
+        aimn = Vector((0.0, -1.0, 0.03)).normalized()
+        mid = rh + aimn * (L * 0.30)
+        quat = aimn.to_track_quat('Y', 'Z')
+        from mathutils import Matrix as _M
+        rifle.matrix_world = _M.Translation(mid) @ quat.to_matrix().to_4x4()
+
     roots = [o for o in sc.objects if o.parent is None and o.type in ('MESH','ARMATURE','EMPTY')]
-    base_state = [(o, o.rotation_euler.copy(), o.location.copy()) for o in roots]
+    base_mw = [(o, o.matrix_world.copy()) for o in roots]
+    # pivot at bbox BOTTOM-center so rocking never lifts the model off its
+    # anchor line (bottom-anchored sprites float otherwise)
+    pivot = Vector((center.x, center.y, lo.z))
+    from mathutils import Matrix
     for i, f in enumerate(frames):
         if wobble:
             ph = 2*math.pi*i/nframes
             pitch = math.radians(wobble.get("pitch", 0))*math.sin(ph)
             roll = math.radians(wobble.get("roll", 0))*math.cos(ph)
             bob = wobble.get("bob", 0)*height*math.sin(2*ph)
-            for o, rot, loc in base_state:
-                o.rotation_euler = (rot.x + pitch, rot.y + roll, rot.z)
-                o.location = (loc.x, loc.y, loc.z + bob)
+            R = (Matrix.Translation(pivot) @ Matrix.Rotation(pitch, 4, 'X')
+                 @ Matrix.Rotation(roll, 4, 'Y') @ Matrix.Translation(-pivot)
+                 @ Matrix.Translation(Vector((0, 0, bob))))
+            for o, mw in base_mw:
+                o.matrix_world = R @ mw
         else:
             sc.frame_set(f)
+        place_rifle()
+        if rifle:
+            dbg = bpy.context.evaluated_depsgraph_get()
+            re_ = rifle.evaluated_get(dbg)
+            pts = [re_.matrix_world @ Vector(c) for c in re_.bound_box]
+            xs=[p.x for p in pts]; ys=[p.y for p in pts]; zs=[p.z for p in pts]
+            log("rifle bbox x", round(min(xs),2), round(max(xs),2), "y", round(min(ys),2), round(max(ys),2), "z", round(min(zs),2), round(max(zs),2))
+            log("cam", tuple(round(v,2) for v in cam.location), "center", tuple(round(v,2) for v in center))
         sc.render.filepath = os.path.join(OUT, f"{name}_{i}.png")
         bpy.ops.render.render(write_still=True)
         log("wrote", sc.render.filepath)

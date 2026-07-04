@@ -37,6 +37,8 @@ web request.
 | `Q` / `E` | Cycle to previous / next weapon |
 | Mouse wheel | Cycle weapons |
 | Click / `Enter` | Start game from the menu, or restart after game over |
+| `Escape` / `P` | Pause / resume the game |
+| `M` (while paused) | Return to the menu |
 
 ## Gameplay notes
 

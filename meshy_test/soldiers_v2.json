@@ -1,0 +1,10 @@
+{
+  "infantry": {
+    "refine": "019f2df0-a27b-791a-8ac8-48bf3fa7efdf",
+    "rig": "019f2df4-484d-739a-bf27-3a495d7206e5"
+  },
+  "commando": {
+    "refine": "019f2df7-165e-7a64-8e2e-8240dfa60831",
+    "rig": "019f2dfa-46dc-74d6-b18f-657e4a65921e"
+  }
+}

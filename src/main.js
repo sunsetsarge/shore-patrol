@@ -20,6 +20,11 @@ const DATA_FILES = {
   crates: 'data/crates.json',
 };
 
+// Display name. "Beach Head" is a live trademark (Access Software 1983 /
+// Digital Fusion's "Beach Head 2000") — the mechanics are free to clone, the
+// name is not. Change this ONE constant to rename the game everywhere it shows.
+const GAME_TITLE = 'SHORE PATROL';
+
 const FIXED_DT = 1 / 60;
 const MAX_ACCUMULATED = 0.25;
 
@@ -216,21 +221,46 @@ function renderPlaying(ctx, game) {
   HUD.render(ctx, game);
 }
 
+// Draw text with a soft dark shadow underneath for legibility over the bright
+// sky/sand. Reused by menu/pause/gameover overlays.
+function shadowText(ctx, text, x, y) {
+  ctx.save();
+  const fill = ctx.fillStyle;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText(text, x + 2, y + 2);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
 function renderMenu(ctx, game) {
   Renderer.drawBackground(ctx, game.time);
   ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(0, 0, 1280, 720);
   ctx.textAlign = 'center';
+
   ctx.fillStyle = '#ffd24a';
-  ctx.font = 'bold 64px monospace';
-  ctx.fillText('BEACHHEAD', 640, 260);
-  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 84px monospace';
+  shadowText(ctx, GAME_TITLE, 640, 250);
+
+  ctx.fillStyle = '#cfe';
   ctx.font = '20px monospace';
-  ctx.fillText('Click or press ENTER to start', 640, 340);
-  ctx.font = '14px monospace';
+  shadowText(ctx, 'Man the beach guns. Hold the line.', 640, 300);
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 26px monospace';
+  shadowText(ctx, 'Click or press ENTER to start', 640, 380);
+
   ctx.fillStyle = '#aac';
-  ctx.fillText(`Best score: ${game.bestScore || ScoreSystem.loadBest()}`, 640, 380);
+  ctx.font = '16px monospace';
+  shadowText(ctx, `Best score: ${game.bestScore || ScoreSystem.loadBest()}`, 640, 420);
+
+  // Controls legend
+  ctx.fillStyle = '#9aa4b2';
+  ctx.font = '15px monospace';
+  shadowText(ctx, 'Mouse aim  ·  Hold LMB fire  ·  1-4 select weapon  ·  Q/E or wheel cycle', 640, 500);
+  shadowText(ctx, 'P pause  ·  F fullscreen', 640, 524);
   ctx.restore();
 }
 
@@ -241,14 +271,14 @@ function renderPaused(ctx, game) {
   ctx.fillRect(0, 0, 1280, 720);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd24a';
-  ctx.font = 'bold 64px monospace';
-  ctx.fillText('PAUSED', 640, 320);
+  ctx.font = 'bold 72px monospace';
+  shadowText(ctx, 'PAUSED', 640, 320);
   ctx.fillStyle = '#fff';
-  ctx.font = '20px monospace';
-  ctx.fillText('ESC / P — resume', 640, 380);
+  ctx.font = '22px monospace';
+  shadowText(ctx, 'ESC / P — resume', 640, 384);
   ctx.fillStyle = '#ccc';
-  ctx.font = '16px monospace';
-  ctx.fillText('M — return to menu', 640, 415);
+  ctx.font = '18px monospace';
+  shadowText(ctx, 'M — return to menu', 640, 420);
   ctx.restore();
 }
 
@@ -259,17 +289,17 @@ function renderGameover(ctx, game) {
   ctx.fillRect(0, 0, 1280, 720);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ff5050';
-  ctx.font = 'bold 56px monospace';
-  ctx.fillText('BASE OVERRUN', 640, 260);
+  ctx.font = 'bold 64px monospace';
+  shadowText(ctx, 'BASE OVERRUN', 640, 260);
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 28px monospace';
-  ctx.fillText(`Score: ${game.score}`, 640, 320);
+  ctx.font = 'bold 32px monospace';
+  shadowText(ctx, `Score: ${game.score}`, 640, 322);
   ctx.fillStyle = '#ffd24a';
-  ctx.font = '20px monospace';
-  ctx.fillText(`Best: ${game.bestScore}`, 640, 355);
+  ctx.font = '22px monospace';
+  shadowText(ctx, `Best: ${game.bestScore}`, 640, 358);
   ctx.fillStyle = '#ccc';
-  ctx.font = '16px monospace';
-  ctx.fillText('Click or press ENTER to restart', 640, 410);
+  ctx.font = '18px monospace';
+  shadowText(ctx, 'Click or press ENTER to restart', 640, 414);
   ctx.restore();
 }
 
@@ -290,6 +320,7 @@ function render(game) {
 async function main() {
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d');
+  document.title = GAME_TITLE;
 
   let data;
   try {

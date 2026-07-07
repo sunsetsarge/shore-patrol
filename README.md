@@ -1,6 +1,11 @@
-# Beachhead
+# Shore Patrol
 
-A browser clone of *Beach Head 2000*'s core loop: stationary turret, mouse aim,
+*(working title — repo folder stays `Beachhead`; the display name lives in the
+`GAME_TITLE` constant in `src/main.js`, changeable in one line. "Beach Head" is
+a trademark; this is an original re-implementation of the mechanics.)*
+
+A browser arcade shooter in the mold of the classic beach-defense games:
+stationary turret, mouse aim,
 4 weapons, ammo economy via shoot-the-crate resupply, land/sea/air enemies,
 escalating waves, a defense meter, and score attack. Pure HTML5 Canvas +
 vanilla JS ES modules. No build step, no dependencies, no audio files

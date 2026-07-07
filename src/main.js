@@ -10,6 +10,7 @@ import * as CrateSystem from './systems/crateSystem.js';
 import * as WaveDirector from './systems/waveDirector.js';
 import * as ScoreSystem from './systems/scoreSystem.js';
 import * as HUD from './systems/hud.js';
+import * as Bosses from './systems/bosses.js';
 import { movementBehaviors } from './systems/movementBehaviors.js';
 import { fireModeHandlers } from './systems/weaponSystem.js';
 
@@ -119,6 +120,9 @@ function createGame(canvas, ctx, data, audio) {
     tidalPhase: 0,
     // Debug
     godMode: false,
+    // Boss state (reset each game)
+    bosses: [],
+    nukeDetonated: false,
   };
   return game;
 }
@@ -194,11 +198,15 @@ function initSystems(game, data) {
   WeaponSystem.init(game, data);
   CrateSystem.init(game, data);
   WaveDirector.init(game, data);
+  Bosses.init(game, data);   // registers bossHitCallback / bossSplashCallback / bossAirTargetCallback
   game.defense = 100;
+  game.nukeDetonated = false;
   game.state = 'playing';
 }
 
 function resetGame(game, data) {
+  game.bosses = [];
+  game.nukeDetonated = false;
   initSystems(game, data);
 }
 
@@ -227,7 +235,17 @@ function update(game, dt) {
   SpawnSystem.update(game, dt);
   CrateSystem.update(game, dt);
   WaveDirector.update(game, dt);
+  Bosses.update(game, dt);   // boss logic runs after wave director
   ScoreSystem.update(game, dt);
+
+  // Nuke detonation: immediate game over with special flag already set
+  if (game.nukeDetonated && game.state === 'playing') {
+    game.defense = 0;
+    game.state = 'gameover';
+    game.bestScore = ScoreSystem.saveBestIfHigher(game.score);
+    game.audio.play('gameover');
+    return;
+  }
 
   if (game.defense <= 0) {
     game.defense = 0;
@@ -263,6 +281,9 @@ function renderPlaying(ctx, game) {
       Renderer.drawEntityGlyph(ctx, e, sx, sy, scale);
     }
   }
+
+  // Boss entities (drawn above water, below turret/HUD)
+  Bosses.draw(ctx, game);
 
   // projectiles
   for (const p of game.projectiles) {
@@ -383,18 +404,34 @@ function renderGameover(ctx, game) {
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(0, 0, 1280, 720);
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#ff5050';
-  ctx.font = 'bold 64px monospace';
-  shadowText(ctx, 'BASE OVERRUN', 640, 260);
+
+  // Special nuke game-over screen
+  if (game.nukeDetonated) {
+    ctx.fillStyle = '#ff6600';
+    ctx.font = 'bold 58px monospace';
+    shadowText(ctx, '☢ NUCLEAR STRIKE ☢', 640, 230);
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 24px monospace';
+    shadowText(ctx, 'THE BOMBER REACHED THE COASTLINE', 640, 286);
+    ctx.fillStyle = '#ff9966';
+    ctx.font = '20px monospace';
+    shadowText(ctx, 'The nuclear payload was released.', 640, 316);
+    shadowText(ctx, 'The beach, and everything beyond it, is gone.', 640, 340);
+  } else {
+    ctx.fillStyle = '#ff5050';
+    ctx.font = 'bold 64px monospace';
+    shadowText(ctx, 'BASE OVERRUN', 640, 260);
+  }
+
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 32px monospace';
-  shadowText(ctx, `Score: ${game.score}`, 640, 322);
+  shadowText(ctx, `Score: ${game.score}`, 640, game.nukeDetonated ? 380 : 322);
   ctx.fillStyle = '#ffd24a';
   ctx.font = '22px monospace';
-  shadowText(ctx, `Best: ${game.bestScore}`, 640, 358);
+  shadowText(ctx, `Best: ${game.bestScore}`, 640, game.nukeDetonated ? 410 : 358);
   ctx.fillStyle = '#ccc';
   ctx.font = '18px monospace';
-  shadowText(ctx, 'Click or press ENTER to restart', 640, 414);
+  shadowText(ctx, 'Click or press ENTER to restart', 640, game.nukeDetonated ? 450 : 414);
   ctx.restore();
 }
 
@@ -483,6 +520,14 @@ async function main() {
       game.godMode = !game.godMode;
       if (game.godMode) game.defense = 100;
       return game.godMode;
+    },
+    spawnBattleship: () => {
+      if (game.state !== 'playing') return;
+      Bosses.spawnBoss(game, 'battleship', 5);
+    },
+    spawnBomber: () => {
+      if (game.state !== 'playing') return;
+      Bosses.spawnBoss(game, 'bomber', 7);
     },
   };
 

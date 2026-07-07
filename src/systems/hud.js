@@ -93,8 +93,20 @@ function drawWaveInfo(ctx, game) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 18px monospace';
-  const label = info.isLooping ? `WAVE ${info.id} (LOOP x${info.loopCount + 1})` : `WAVE ${info.id}/5`;
+
+  let label;
+  if (info.isLooping) {
+    label = `STAGE 10 (LOOP x${info.loopCount})`;
+  } else {
+    const total = info.total || 10;
+    label = `STAGE ${info.id}/${total}`;
+  }
+  // Highlight boss stages in orange
+  if (info.hasBoss && !info.isLooping) {
+    ctx.fillStyle = '#ff9944';
+  }
   st(ctx, label, 640, 36);
+  ctx.fillStyle = '#fff'; // reset
 
   if (info.banner) {
     const alpha = Math.min(1, info.banner.timer);

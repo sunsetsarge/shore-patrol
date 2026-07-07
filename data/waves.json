@@ -4,155 +4,128 @@
       "id": 1,
       "name": "First Landing",
       "duration": 45,
-      "difficulty": {
-        "hp": 1.0,
-        "speed": 1.0
-      },
+      "difficulty": { "hp": 1.0, "speed": 1.0 },
       "spawns": [
-        {
-          "enemyId": "landing_craft",
-          "count": 2,
-          "interval": 16,
-          "startDelay": 2
-        }
+        { "enemyId": "landing_craft", "count": 2, "interval": 16, "startDelay": 3 }
       ],
-      "crates": {
-        "interval": 14,
-        "types": [
-          "mg_crate",
-          "howitzer_crate"
-        ]
-      }
+      "crates": { "interval": 14, "types": ["mg_crate", "howitzer_crate"] }
     },
     {
       "id": 2,
       "name": "Beach Assault",
       "duration": 50,
-      "difficulty": {
-        "hp": 1.1,
-        "speed": 1.0
-      },
+      "difficulty": { "hp": 1.1, "speed": 1.0 },
       "spawns": [
-        {
-          "enemyId": "landing_craft",
-          "count": 4,
-          "interval": 11,
-          "startDelay": 2
-        }
+        { "enemyId": "landing_craft", "count": 3, "interval": 14, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 1, "interval": 25, "startDelay": 10 }
       ],
-      "crates": {
-        "interval": 13,
-        "types": [
-          "mg_crate",
-          "howitzer_crate",
-          "sam_crate"
-        ]
-      }
+      "crates": { "interval": 13, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
     },
     {
       "id": 3,
       "name": "Armor Push",
       "duration": 55,
-      "difficulty": {
-        "hp": 1.2,
-        "speed": 1.05
-      },
+      "difficulty": { "hp": 1.15, "speed": 1.02 },
       "spawns": [
-        {
-          "enemyId": "tank",
-          "count": 4,
-          "interval": 9,
-          "startDelay": 4
-        },
-        {
-          "enemyId": "commando_craft",
-          "count": 2,
-          "interval": 15,
-          "startDelay": 3
-        }
+        { "enemyId": "landing_craft", "count": 3, "interval": 12, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 2, "interval": 18, "startDelay": 6 },
+        { "enemyId": "tank", "count": 2, "interval": 15, "startDelay": 8 }
       ],
-      "crates": {
-        "interval": 12,
-        "types": [
-          "mg_crate",
-          "howitzer_crate",
-          "sam_crate"
-        ]
-      }
+      "crates": { "interval": 12, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
     },
     {
       "id": 4,
-      "name": "Air Support",
-      "duration": 60,
-      "difficulty": {
-        "hp": 1.3,
-        "speed": 1.1
-      },
+      "name": "Combined Arms",
+      "duration": 55,
+      "difficulty": { "hp": 1.2, "speed": 1.05 },
       "spawns": [
-        {
-          "enemyId": "landing_craft",
-          "count": 3,
-          "interval": 10,
-          "startDelay": 5
-        },
-        {
-          "enemyId": "helicopter",
-          "count": 4,
-          "interval": 10,
-          "startDelay": 4
-        }
+        { "enemyId": "landing_craft", "count": 4, "interval": 11, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 2, "interval": 14, "startDelay": 4 },
+        { "enemyId": "tank", "count": 3, "interval": 11, "startDelay": 5 }
       ],
-      "crates": {
-        "interval": 11,
-        "types": [
-          "mg_crate",
-          "howitzer_crate",
-          "sam_crate"
-        ]
-      }
+      "crates": { "interval": 11, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
     },
     {
       "id": 5,
-      "name": "Full Assault",
-      "duration": 70,
-      "difficulty": {
-        "hp": 1.4,
-        "speed": 1.2
-      },
+      "name": "Sea Dominion",
+      "duration": 60,
+      "boss": "battleship",
+      "difficulty": { "hp": 1.3, "speed": 1.1 },
       "spawns": [
-        {
-          "enemyId": "landing_craft",
-          "count": 4,
-          "interval": 8,
-          "startDelay": 2
-        },
-        {
-          "enemyId": "commando_craft",
-          "count": 2,
-          "interval": 14,
-          "startDelay": 6
-        },
-        {
-          "enemyId": "tank",
-          "count": 4,
-          "interval": 7,
-          "startDelay": 3
-        },
-        {
-          "enemyId": "helicopter",
-          "count": 5,
-          "interval": 7,
-          "startDelay": 5
-        }
+        { "enemyId": "landing_craft", "count": 3, "interval": 10, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 2, "interval": 13, "startDelay": 5 },
+        { "enemyId": "tank", "count": 3, "interval": 10, "startDelay": 4 },
+        { "enemyId": "helicopter", "count": 1, "interval": 30, "startDelay": 12 }
       ],
-      "crates": {
-        "interval": 10,
-        "types": [
-          "mg_crate",
-          "howitzer_crate",
-          "sam_crate"
-        ]
-      }
+      "crates": { "interval": 10, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
+    },
+    {
+      "id": 6,
+      "name": "Air Superiority",
+      "duration": 65,
+      "difficulty": { "hp": 1.4, "speed": 1.15 },
+      "spawns": [
+        { "enemyId": "landing_craft", "count": 4, "interval": 9, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 2, "interval": 12, "startDelay": 4 },
+        { "enemyId": "tank", "count": 4, "interval": 9, "startDelay": 3 },
+        { "enemyId": "helicopter", "count": 2, "interval": 16, "startDelay": 6 }
+      ],
+      "crates": { "interval": 10, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
+    },
+    {
+      "id": 7,
+      "name": "Air Raid",
+      "duration": 70,
+      "boss": "bomber",
+      "difficulty": { "hp": 1.55, "speed": 1.25 },
+      "spawns": [
+        { "enemyId": "landing_craft", "count": 5, "interval": 8, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 3, "interval": 11, "startDelay": 4 },
+        { "enemyId": "tank", "count": 4, "interval": 8, "startDelay": 3 },
+        { "enemyId": "helicopter", "count": 3, "interval": 13, "startDelay": 5 }
+      ],
+      "crates": { "interval": 10, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
+    },
+    {
+      "id": 8,
+      "name": "Heavy Push",
+      "duration": 70,
+      "difficulty": { "hp": 1.7, "speed": 1.35 },
+      "spawns": [
+        { "enemyId": "landing_craft", "count": 5, "interval": 8, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 3, "interval": 10, "startDelay": 3 },
+        { "enemyId": "tank", "count": 5, "interval": 7, "startDelay": 3 },
+        { "enemyId": "helicopter", "count": 4, "interval": 10, "startDelay": 5 }
+      ],
+      "crates": { "interval": 10, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
+    },
+    {
+      "id": 9,
+      "name": "Dreadnought",
+      "duration": 75,
+      "boss": "battleship_final",
+      "difficulty": { "hp": 2.0, "speed": 1.45 },
+      "spawns": [
+        { "enemyId": "landing_craft", "count": 6, "interval": 7, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 3, "interval": 9, "startDelay": 3 },
+        { "enemyId": "tank", "count": 5, "interval": 7, "startDelay": 3 },
+        { "enemyId": "helicopter", "count": 5, "interval": 9, "startDelay": 4 }
+      ],
+      "crates": { "interval": 9, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
+    },
+    {
+      "id": 10,
+      "name": "Final Assault",
+      "duration": 80,
+      "boss": "final",
+      "difficulty": { "hp": 2.5, "speed": 1.6 },
+      "spawns": [
+        { "enemyId": "landing_craft", "count": 6, "interval": 7, "startDelay": 2 },
+        { "enemyId": "commando_craft", "count": 4, "interval": 8, "startDelay": 3 },
+        { "enemyId": "tank", "count": 6, "interval": 6, "startDelay": 2 },
+        { "enemyId": "helicopter", "count": 6, "interval": 8, "startDelay": 4 }
+      ],
+      "crates": { "interval": 9, "types": ["mg_crate", "howitzer_crate", "sam_crate"] }
     }
   ]
 }

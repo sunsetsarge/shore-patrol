@@ -108,6 +108,11 @@ function projectedHitTest(game, weapon, screenX, screenY) {
       if (hit && 0 < bestD) { bestD = 0; best = c; }
     }
   }
+  // Boss hit test (registered by Bosses.init via game.bossHitCallback)
+  if (!best && game.bossHitCallback) {
+    const bossHit = game.bossHitCallback(weapon, screenX, screenY);
+    if (bossHit) best = bossHit;
+  }
   return best;
 }
 
@@ -147,6 +152,10 @@ function splashDamage(game, weapon, worldX, worldD) {
         applyDamage(game, c, weapon.damage);
       }
     }
+  }
+  // Boss splash callback (registered by Bosses.init via game.bossSplashCallback)
+  if (game.bossSplashCallback) {
+    game.bossSplashCallback(weapon, worldX, worldD);
   }
 }
 
@@ -245,6 +254,11 @@ function fireGuided(game, weapon, turret) {
     const { sx, sy } = project(e.x, e.d, e.alt, 'air');
     const dist = screenDistance(turret.aimX, turret.aimY, sx, sy);
     if (dist <= bestDist) { bestDist = dist; best = e; }
+  }
+  // Also offer boss air targets (bomber + escorts) via registered callback
+  if ((!best || bestDist > 50) && game.bossAirTargetCallback) {
+    const r = game.bossAirTargetCallback(turret.aimX, turret.aimY, bestDist);
+    if (r) { best = r.target; bestDist = r.dist; }
   }
   const domain = 'air';
   const fallbackD = unprojectD(turret.aimY, domain);

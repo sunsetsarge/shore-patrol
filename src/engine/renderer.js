@@ -699,10 +699,22 @@ export function drawClouds(ctx, clouds) {
   }
 }
 
-// -------------------- NEW: tidal wave wash on the shoreline --------------------
+// -------------------- Tidal wave wash — perspective-angled shoreline ----------
+// Background has diagonal perspective (lower-left → upper-right), so the
+// waterline is not flat: left edge sits 15 px BELOW SEA_Y, right edge 15 px ABOVE.
 export function drawTidal(ctx, tidalPhase) {
   const washExtent = 12;
-  const phase = tidalPhase;
+  const phase      = tidalPhase;
+  const leftY      = SEA_Y + 15;   // lower-left (near shore, closer to player)
+  const rightY     = SEA_Y - 15;   // upper-right (receding perspective)
+
+  function waveY(px) {
+    const t    = px / CANVAS_W;
+    const base = leftY + (rightY - leftY) * t;         // perspective slope
+    const wave = Math.sin(px * 0.015 + phase)  * 4
+               + Math.sin(px * 0.03  - phase * 1.3) * 2;
+    return base - washExtent * Math.max(0, Math.sin(phase * 0.7)) + wave;
+  }
 
   ctx.save();
   ctx.globalAlpha = 0.35;
@@ -710,15 +722,12 @@ export function drawTidal(ctx, tidalPhase) {
 
   // Animated wash body
   ctx.beginPath();
-  ctx.moveTo(0, SEA_Y);
+  ctx.moveTo(0, leftY);
   for (let px = 0; px <= CANVAS_W; px += 4) {
-    const wave = Math.sin(px * 0.015 + phase) * 4
-               + Math.sin(px * 0.03 - phase * 1.3) * 2;
-    const washY = SEA_Y - washExtent * Math.max(0, Math.sin(phase * 0.7)) + wave;
-    ctx.lineTo(px, washY);
+    ctx.lineTo(px, waveY(px));
   }
-  ctx.lineTo(CANVAS_W, SEA_Y + 8);
-  ctx.lineTo(0, SEA_Y + 8);
+  ctx.lineTo(CANVAS_W, rightY + 8);
+  ctx.lineTo(0, leftY + 8);
   ctx.closePath();
   ctx.fill();
 
@@ -728,10 +737,7 @@ export function drawTidal(ctx, tidalPhase) {
   ctx.lineWidth = 2;
   ctx.beginPath();
   for (let px = 0; px <= CANVAS_W; px += 4) {
-    const wave = Math.sin(px * 0.015 + phase) * 4
-               + Math.sin(px * 0.03 - phase * 1.3) * 2;
-    const washY = SEA_Y - washExtent * Math.max(0, Math.sin(phase * 0.7)) + wave;
-    px === 0 ? ctx.moveTo(px, washY) : ctx.lineTo(px, washY);
+    px === 0 ? ctx.moveTo(px, waveY(px)) : ctx.lineTo(px, waveY(px));
   }
   ctx.stroke();
   ctx.restore();

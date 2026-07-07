@@ -26,6 +26,15 @@
       "spawnWeight": 2,
       "color": "#e8c832",
       "sprite": "assets/crate_sam.png"
+    },
+    {
+      "id": "upgrade_crate",
+      "weaponId": "mg",
+      "amount": 0,
+      "dropSpeed": 0.040,
+      "spawnWeight": 1,
+      "color": "#ff9933",
+      "sprite": "assets/crate_upgrade.png"
     }
   ]
 }

@@ -60,8 +60,18 @@ export function update(game, dt) {
     c.alt -= c.type.dropSpeed * dt;
     if (c.alt <= 0) {
       c.alt = 0;
-      c.dead = true;
-      c.collected = false;
+      if (!c.landed) {
+        c.landed = true;
+        c.landedTimer = 0;
+      }
+    }
+    // Landed crates survive for LANDED_TTL seconds so the player can click them
+    if (c.landed) {
+      c.landedTimer = (c.landedTimer || 0) + dt;
+      if (c.landedTimer >= 10.0) {
+        c.dead = true;
+        c.collected = false; // timed out — no refill
+      }
     }
   }
 

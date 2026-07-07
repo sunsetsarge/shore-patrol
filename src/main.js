@@ -11,6 +11,7 @@ import * as WaveDirector from './systems/waveDirector.js';
 import * as ScoreSystem from './systems/scoreSystem.js';
 import * as HUD from './systems/hud.js';
 import * as Bosses from './systems/bosses.js';
+import * as UpgradeSystem from './systems/upgradeSystem.js';
 import { movementBehaviors } from './systems/movementBehaviors.js';
 import { fireModeHandlers } from './systems/weaponSystem.js';
 
@@ -199,6 +200,7 @@ function initSystems(game, data) {
   CrateSystem.init(game, data);
   WaveDirector.init(game, data);
   Bosses.init(game, data);   // registers bossHitCallback / bossSplashCallback / bossAirTargetCallback
+  UpgradeSystem.init(game);  // weapon tiers + upgrade panel state
   game.defense = 100;
   game.nukeDetonated = false;
   game.state = 'playing';
@@ -224,8 +226,15 @@ function update(game, dt) {
       game.state = 'paused';
       continue;
     }
-    // 'menu' does nothing during active play — no accidental quits.
     if (evt.type === 'menu') continue;
+    // Upgrade system intercepts fireStart clicks when a panel is open
+    // or when the player clicks a landed crate — returns true to suppress fire.
+    if (evt.type === 'fireStart') {
+      const consumed = UpgradeSystem.handleClick(
+        game, game.turret.aimX, game.turret.aimY,
+      );
+      if (consumed) continue;
+    }
     WeaponSystem.handleInputEvent(game, evt);
   }
 
@@ -332,6 +341,7 @@ function renderPlaying(ctx, game) {
   Renderer.drawReticle(ctx, game.turret.aimX, game.turret.aimY, weapon.reticle, weapon.color);
 
   HUD.render(ctx, game);
+  UpgradeSystem.draw(ctx, game); // upgrade panel on top of everything
 }
 
 // Draw text with a soft dark shadow underneath for legibility over the bright

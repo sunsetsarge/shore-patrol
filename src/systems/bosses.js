@@ -42,8 +42,9 @@ class BattleshipBoss {
     this.listAngle = 0;                 // visual tilt when hull destroyed
 
     // Ship dimensions (virtual world units, scaled to canvas in draw)
-    this.worldW = 280 * this.scale;
-    this.worldH = 45  * this.scale;
+    // 5× bigger so the dreadnought fills ~55% of canvas width when beached
+    this.worldW = 1400 * this.scale;
+    this.worldH = 225  * this.scale;
 
     // Fire timers
     this.fwdFireTimer  = 2.5 + Math.random() * 2;
@@ -125,11 +126,13 @@ class BattleshipBoss {
     return null;
   }
 
-  // Howitzer splash: check if impact is near enough to damage sections
+  // Howitzer splash: check if impact is near enough to damage sections.
+  // Depth tolerance is large because clicking the ship superstructure unprojects
+  // to a depth shallower than the keel — we only care about horizontal distance.
   handleSplash(weapon, worldX, worldD) {
     const dx = Math.abs(worldX - this.x) * 640;
     const dd = Math.abs(worldD - this.d) * 900;
-    if (dx + dd > weapon.splashRadius + 80) return; // 80 px tolerance for ship width
+    if (dx + dd > weapon.splashRadius + 280) return; // generous dd tolerance
     for (const sec of Object.values(this.sections)) {
       if (sec.dead) continue;
       sec.hp -= weapon.damage * 0.5; // splash is half damage to each section
@@ -357,44 +360,51 @@ class BattleshipBoss {
   }
 
   _drawHpBars(ctx) {
-    const { sx, sy, scale } = this.screenPos();
-    const w = this.worldW * scale;
-    const labels = {
-      fwdTurret: { label:'FWD GUN', color:'#ff6644' },
-      rearTurret:{ label:'RR GUN',  color:'#ff8844' },
-      bridge:    { label:'BRIDGE',  color:'#44aaff' },
-      hullPort:  { label:'HULL',    color:'#ff3333' },
-      engine:    { label:'ENGINE',  color:'#ffcc44' },
-    };
-    let barY = sy - this.worldH * scale * 3.2;
-    const barW = 88; const barH = 8;
+    // Compact corner panel – top-right of screen, never over the ship
+    const panelX = ctx.canvas.width - 180;
+    const panelY = 10;
+    const barW   = 120;
+    const barH   = 10;
+
+    const rows = [
+      { key: 'fwdTurret',  label: 'FWD TURRET', color: '#ff6600' },
+      { key: 'rearTurret', label: 'RR TURRET',  color: '#ff8800' },
+      { key: 'bridge',     label: 'BRIDGE',      color: '#4488ff' },
+      { key: 'hullPort',   label: 'HULL',        color: '#cc2222' },
+      { key: 'engine',     label: 'ENGINE',      color: '#ffcc00' },
+    ];
+
     ctx.save();
-    ctx.font = 'bold 10px monospace';
-    for (const [name, sec] of Object.entries(this.sections)) {
-      const info = labels[name];
-      const pct  = clamp01(sec.hp / sec.maxHp);
-      // Background
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(sx - barW/2 - 2, barY - 2, barW + 4, barH + 14);
-      // Empty bar
-      ctx.fillStyle = '#333';
-      ctx.fillRect(sx - barW/2, barY + 10, barW, barH);
-      // Fill bar
-      ctx.fillStyle = sec.dead ? '#222' : info.color;
-      ctx.fillRect(sx - barW/2, barY + 10, barW * pct, barH);
-      // Label
-      ctx.fillStyle = sec.dead ? '#555' : '#eee';
-      ctx.textAlign = 'center';
-      ctx.fillText(sec.dead ? `✕ ${info.label}` : info.label, sx, barY + 9);
-      barY += 22;
+    // Background panel (172 × 110)
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(panelX - 8, panelY, 172, 110);
+
+    // Title
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ff3333';
+    ctx.fillText(this.scale >= 1.5 ? '⚓ DREADNOUGHT' : '⚓ BATTLESHIP',
+                 panelX - 4, panelY + 12);
+
+    let y = panelY + 18;
+    for (const { key, label, color } of rows) {
+      const sec = this.sections[key];
+      const pct = clamp01(sec.hp / sec.maxHp);
+
+      // Section label
+      ctx.font = '9px monospace';
+      ctx.fillStyle = sec.dead ? '#555' : '#aaa';
+      ctx.fillText(label, panelX - 4, y + 9);
+      y += 11;
+
+      // Bar background
+      ctx.fillStyle = '#222';
+      ctx.fillRect(panelX - 4, y, barW, barH);
+      // Bar fill
+      ctx.fillStyle = sec.dead ? '#333' : color;
+      ctx.fillRect(panelX - 4, y, barW * pct, barH);
+      y += barH + 4;
     }
-    // Ship name banner
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(sx - 70, barY + 2, 140, 16);
-    ctx.fillStyle = this.scale >= 1.5 ? '#ff3333' : '#cc4444';
-    ctx.font = 'bold 12px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(this.scale >= 1.5 ? '⚠ DREADNOUGHT' : '⚠ BATTLESHIP', sx, barY + 14);
     ctx.restore();
   }
 } // end BattleshipBoss
@@ -446,9 +456,15 @@ class FighterEscort {
 
   draw(ctx) {
     if (this.dead) return;
-    const alt = this.attacking ? this.alt - this.attackY * 0.5 : this.alt;
-    const { sx, sy, scale } = project(this.x, this.d, alt, 'air');
-    const s = 11 * scale;
+    // Position relative to bomber's z-approach screen coords
+    const bomber = this._bomber;
+    const S   = bomber.drawScale;
+    const dip = this.attacking ? this.attackY * 40 * S : 0;
+    const sx  = bomber.drawX + this.offsetX * 100 * S
+              + Math.cos(this.orbitPhase) * 30 * S;
+    const sy  = bomber.drawY + this.offsetAlt * 80 * S
+              + Math.sin(this.orbitPhase * 1.3) * 15 * S + dip;
+    const s   = 11 * S;
     ctx.save();
     ctx.fillStyle = '#2a3040';
     // Fuselage
@@ -477,11 +493,19 @@ class BomberBoss {
     this.scale    = bossScale || 1.0;   // 1.2 for stage-10 B-2
     this.isFinal  = stageId >= 10;
 
-    // World position (air domain)
-    this.x   = 1.65;     // starts off-screen right
-    this.d   = 0.04;
+    // World position (kept for SAM/escort compatibility; d synced from approachZ)
+    this.x   = 0;        // centered world-x
+    this.d   = 1.0;      // starts at horizon
     this.alt = 0.80;
-    this.speed = this.isFinal ? 0.048 : 0.038; // world-x units/sec
+
+    // Z-approach state: 0 = tiny speck at horizon, 1 = looming overhead
+    this.approachZ     = 0;
+    this.approachSpeed = this.isFinal ? 0.06 : 0.045; // z-units/sec
+
+    // Screen-space draw state (updated every frame in update())
+    this.drawX     = CANVAS_W * 0.5;
+    this.drawY     = HORIZON_Y - 20;
+    this.drawScale = 0.04;
 
     // Pseudo-entity fields (applyDamage targets this directly)
     this.hp           = this.isFinal ? 900 : 550;
@@ -492,11 +516,10 @@ class BomberBoss {
     this.flags        = {}; this.data = {};
 
     this.nukeArmed    = true;
-    this.nukeDropX    = -0.05;      // world-x where bomb doors open
     this.bombBayOpen  = false;
-    this.bombBayTimer = 0;           // counts up to 2.0 (door opening)
+    this.bombBayTimer = 0;
     this.nukeDropped  = false;
-    this.nuke         = null;        // { x, y } screen-space once dropped
+    this.nuke         = null;
     this.scoreValue   = this.isFinal ? 10000 : 6000;
 
     // Fighter escorts
@@ -527,15 +550,14 @@ class BomberBoss {
   hitTestScreen(weapon, clickX, clickY) {
     if (!weapon.targetDomains.includes('air')) return null;
     if (this.dead) return null;
-    const { sx, sy, scale } = project(this.x, this.d, this.alt, 'air');
-    const r = 48 * scale * this.scale;
-    if (screenDist(clickX, clickY, sx, sy) <= r) return this;
-    // Also check escorts
+    // Use screen-space draw position (z-approach canonical state)
+    if (screenDist(clickX, clickY, this.drawX, this.drawY) <= 80 * this.drawScale) return this;
+    // Check escorts (positioned relative to bomber draw coords)
     for (const esc of this.escorts) {
       if (esc.dead) continue;
-      const ep = project(esc.x, esc.d, esc.alt, 'air');
-      const er = 18 * ep.scale;
-      if (screenDist(clickX, clickY, ep.sx, ep.sy) <= er) return esc;
+      const ex = this.drawX + esc.offsetX * 100 * this.drawScale;
+      const ey = this.drawY + esc.offsetAlt * 80  * this.drawScale;
+      if (screenDist(clickX, clickY, ex, ey) <= 20 * this.drawScale) return esc;
     }
     return null;
   }
@@ -551,18 +573,25 @@ class BomberBoss {
       return;
     }
 
-    // Move left
-    this.x -= this.speed * dt;
+    // Z-approach: advance from horizon toward player
+    this.approachZ = Math.min(1.0, this.approachZ + this.approachSpeed * dt);
 
-    // Open bomb bay when approaching coast
-    if (!this.nukeDropped && !this.dead && this.x <= this.nukeDropX && !this.bombBayOpen) {
+    // Update canonical screen-space draw state
+    this.drawScale = lerp(0.04, 1.2, this.approachZ) * this.scale;
+    this.drawX     = CANVAS_W * 0.5;
+    this.drawY     = lerp(HORIZON_Y - 20, 80, this.approachZ);
+
+    // Sync world-d so SAM targeting & escorts get a sensible depth
+    this.d = lerp(1.0, 0.04, this.approachZ);
+
+    // Open bomb bay when close enough (approachZ >= 0.85)
+    if (!this.nukeDropped && !this.dead && this.approachZ >= 0.85 && !this.bombBayOpen) {
       this.bombBayOpen = true;
       this.bombBayTimer = 0;
     }
     if (this.bombBayOpen) {
       this.bombBayTimer += dt;
       if (this.bombBayTimer >= 2.0 && !this.nukeDropped) {
-        // Drop the nuke — game over
         this.nukeDropped = true;
         game.nukeDetonated = true;
       }
@@ -578,13 +607,12 @@ class BomberBoss {
       this.dead = true;
       this.killedByPlayer = true;
       this.killMoment = true;
-      // Spawn debris particles
-      const { sx, sy } = project(this.x, this.d, this.alt, 'air');
+      // Spawn debris particles at current screen position
       for (let i = 0; i < 22; i++) {
         const ang = Math.random() * Math.PI * 2;
         const spd = 30 + Math.random() * 80;
         this.deathParticles.push({
-          x: sx, y: sy,
+          x: this.drawX, y: this.drawY,
           vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
           life: 1.2 + Math.random()*1.5, maxLife: 2.5,
           alpha: 1, size: 3 + Math.random()*6,
@@ -595,7 +623,7 @@ class BomberBoss {
   }
 
   draw(ctx) {
-    // Draw debris particles from death
+    // Debris particles from death
     for (const p of this.deathParticles) {
       ctx.save();
       ctx.globalAlpha = p.alpha;
@@ -605,138 +633,115 @@ class BomberBoss {
       ctx.fill();
       ctx.restore();
     }
-
     if (this.dead) return;
 
-    const { sx, sy, scale } = project(this.x, this.d, this.alt, 'air');
-    const S = scale * this.scale;
+    const S  = this.drawScale; // canonical draw scale (z-based)
+    const cx = this.drawX;
+    const cy = this.drawY;
 
     ctx.save();
-    ctx.translate(sx, sy);
+    ctx.translate(cx, cy);
 
-    // ── B-52 top-down vector art ──────────────────────────────
-    // Fuselage (long narrow body, slightly swept)
+    // ── FRONT-FACING SILHOUETTE (approaching from horizon) ────────────
+    // Fuselage: tall narrow ellipse (foreshortened front view)
     ctx.fillStyle = '#2a2a35';
     ctx.beginPath();
-    ctx.ellipse(0, 0, 7*S, 52*S, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, 6*S, 22*S, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Main delta-like swept wings (very long span)
+    // Wings: wide swept (front view — full wingspan visible)
     ctx.fillStyle = '#1e1e28';
-    ctx.beginPath();
     // Right wing
-    ctx.moveTo(2*S, -10*S);      // root leading edge
-    ctx.lineTo(62*S, 10*S);      // tip leading edge
-    ctx.lineTo(62*S, 18*S);      // tip trailing edge
-    ctx.lineTo(2*S,  18*S);      // root trailing edge
+    ctx.beginPath();
+    ctx.moveTo(0,    -5*S);
+    ctx.lineTo(90*S,  8*S);
+    ctx.lineTo(90*S, 16*S);
+    ctx.lineTo(0,    12*S);
     ctx.closePath();
     ctx.fill();
-    // Left wing (mirror)
+    // Left wing
     ctx.beginPath();
-    ctx.moveTo(-2*S, -10*S);
-    ctx.lineTo(-62*S, 10*S);
-    ctx.lineTo(-62*S, 18*S);
-    ctx.lineTo(-2*S,  18*S);
+    ctx.moveTo(0,     -5*S);
+    ctx.lineTo(-90*S,  8*S);
+    ctx.lineTo(-90*S, 16*S);
+    ctx.lineTo(0,     12*S);
     ctx.closePath();
     ctx.fill();
 
-    // Wing highlight line
+    // Wing highlight
     ctx.strokeStyle = '#3a3a50';
-    ctx.lineWidth = 1.5*S;
+    ctx.lineWidth = 1.5 * Math.max(0.5, S);
     ctx.beginPath();
-    ctx.moveTo(4*S, -5*S); ctx.lineTo(58*S, 12*S);
-    ctx.moveTo(-4*S, -5*S); ctx.lineTo(-58*S, 12*S);
+    ctx.moveTo(0, -2*S); ctx.lineTo(80*S, 10*S);
+    ctx.moveTo(0, -2*S); ctx.lineTo(-80*S, 10*S);
     ctx.stroke();
 
-    // Horizontal stabilizers (rear)
-    ctx.fillStyle = '#1a1a24';
-    ctx.beginPath();
-    ctx.moveTo(2*S,  30*S);
-    ctx.lineTo(22*S, 38*S);
-    ctx.lineTo(20*S, 44*S);
-    ctx.lineTo(2*S,  44*S);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(-2*S,  30*S);
-    ctx.lineTo(-22*S, 38*S);
-    ctx.lineTo(-20*S, 44*S);
-    ctx.lineTo(-2*S,  44*S);
-    ctx.closePath();
-    ctx.fill();
-
-    // Engine pods — 4 pairs under wings (B-52 has 8 engines in 4 pods)
-    const podPositions = [12, 26, 38, 50];
-    for (const px of podPositions) {
+    // 8 engine pods (4 per wing) — front-view: circles with glow
+    const podX = [18, 34, 52, 68];
+    for (const px of podX) {
       for (const side of [1, -1]) {
-        const px2 = px * S * side;
-        const py = (2 + px * 0.12) * S;
+        const ex = px * S * side;
+        const ey = (3 + px * 0.10) * S;
         ctx.fillStyle = '#111118';
         ctx.beginPath();
-        ctx.ellipse(px2, py, 3*S, 7*S, 0.15*side, 0, Math.PI*2);
+        ctx.arc(ex, ey, 4 * S, 0, Math.PI * 2);
         ctx.fill();
-        // Engine exhaust glow
-        ctx.fillStyle = 'rgba(255,140,0,0.35)';
+        ctx.fillStyle = 'rgba(255,140,0,0.55)';
         ctx.beginPath();
-        ctx.ellipse(px2, py + 5*S, 2*S, 3*S, 0, 0, Math.PI*2);
+        ctx.arc(ex, ey, 2.5 * S, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-    // Nose cone
+    // Nose (front view: slightly pointed ellipse)
     ctx.fillStyle = '#3a3a50';
     ctx.beginPath();
-    ctx.ellipse(0, -52*S, 4*S, 8*S, 0, 0, Math.PI*2);
+    ctx.ellipse(0, -20*S, 5*S, 7*S, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Cockpit windows
-    ctx.fillStyle = '#8888cc';
+    // Cockpit window
+    ctx.fillStyle = '#7799cc';
     ctx.beginPath();
-    ctx.ellipse(0, -40*S, 3*S, 4*S, 0, 0, Math.PI*2);
+    ctx.ellipse(0, -13*S, 3*S, 4*S, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Bomb bay doors
     if (this.bombBayOpen) {
-      const openAmt = Math.min(1, this.bombBayTimer / 1.5); // 0→1
-      ctx.fillStyle = `rgba(10,10,10,${openAmt})`;
-      ctx.beginPath();
-      ctx.rect(-4*S, 5*S, 8*S * openAmt, 20*S);
-      ctx.fill();
-      // Bomb visible in bay
+      const openAmt = Math.min(1, this.bombBayTimer / 1.5);
+      ctx.fillStyle = `rgba(10,10,10,${openAmt * 0.85})`;
+      ctx.fillRect(-5*S, 4*S, 10*S, 20*S * openAmt);
       if (openAmt > 0.5) {
         const bAlpha = (openAmt - 0.5) * 2;
         ctx.fillStyle = `rgba(40,40,50,${bAlpha})`;
         ctx.beginPath();
-        ctx.ellipse(0, 14*S, 2.5*S, 8*S, 0, 0, Math.PI*2);
+        ctx.ellipse(0, 14*S, 2.5*S, 8*S, 0, 0, Math.PI * 2);
         ctx.fill();
-        // Nuke warning glow
         ctx.fillStyle = `rgba(255,0,0,${bAlpha * 0.5})`;
         ctx.beginPath();
-        ctx.arc(0, 14*S, 10*S, 0, Math.PI*2);
+        ctx.arc(0, 14*S, 10*S, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-    // HP bar above bomber
+    // HP bar
     if (this.hp < this.maxHp) {
-      const bw = 90*S, bh = 7*S;
-      const bx = -bw/2, by = -70*S;
+      const bw = 90 * S, bh = 7 * S;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = this.hp > this.maxHp*0.5 ? '#00dd44' : this.hp > this.maxHp*0.25 ? '#ffaa00' : '#ff3300';
-      ctx.fillRect(bx, by, bw * (this.hp/this.maxHp), bh);
-      ctx.strokeStyle = '#ffffff55';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(bx, by, bw, bh);
+      ctx.fillRect(-bw / 2, -36*S, bw, bh);
+      ctx.fillStyle = this.hp > this.maxHp * 0.5 ? '#00dd44'
+                    : this.hp > this.maxHp * 0.25 ? '#ffaa00' : '#ff3300';
+      ctx.fillRect(-bw / 2, -36*S, bw * (this.hp / this.maxHp), bh);
+      ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 1;
+      ctx.strokeRect(-bw / 2, -36*S, bw, bh);
       ctx.fillStyle = '#fff';
-      ctx.font = `${Math.max(8, 9*S)}px monospace`;
+      ctx.font = `${Math.max(8, Math.round(9 * S))}px monospace`;
       ctx.textAlign = 'center';
-      ctx.fillText('BOMBER', 0, by - 3*S);
+      ctx.fillText('BOMBER', 0, -36*S - 3);
     }
 
     ctx.restore();
 
-    // Draw escorts
+    // Draw escorts (screen-relative to this bomber)
     for (const esc of this.escorts) {
       if (!esc.dead) esc.draw(ctx);
     }
@@ -773,20 +778,21 @@ export function init(game, _data) {
     }
   };
 
-  // SAM guided missile targeting: find bomber targets
+  // SAM guided missile targeting: find bomber targets using z-approach screen coords
   game.bossAirTargetCallback = (aimX, aimY, currentBestDist) => {
     let best = null; let bestDist = currentBestDist;
     for (const boss of game.bosses) {
       if (!(boss instanceof BomberBoss) || !boss.alive) continue;
-      const { sx, sy } = project(boss.x, boss.d, boss.alt, 'air');
-      const dx = sx - aimX; const dy = sy - aimY;
+      // Use canonical draw position (z-approach state)
+      const dx = boss.drawX - aimX; const dy = boss.drawY - aimY;
       const dist = Math.sqrt(dx*dx + dy*dy);
       if (dist < bestDist) { bestDist = dist; best = boss; }
-      // Also offer escorts as targets
+      // Escorts positioned relative to bomber draw coords
       for (const esc of boss.escorts) {
         if (esc.dead) continue;
-        const ep = project(esc.x, esc.d, esc.alt, 'air');
-        const ed = Math.sqrt((ep.sx-aimX)**2 + (ep.sy-aimY)**2);
+        const ex = boss.drawX + esc.offsetX * 100 * boss.drawScale;
+        const ey = boss.drawY + esc.offsetAlt * 80  * boss.drawScale;
+        const ed = Math.sqrt((ex-aimX)**2 + (ey-aimY)**2);
         if (ed < bestDist) { bestDist = ed; best = esc; }
       }
     }

@@ -143,6 +143,12 @@ function splashDamage(game, weapon, worldX, worldD) {
     if (!weapon.targetDomains.includes(domainForEnemy(e))) continue;
     if (withinSplash(worldX, worldD, e.x, e.d, weapon.splashRadius)) {
       applyDamage(game, e, weapon.damage);
+    } else if (domainForEnemy(e) === 'sea' &&
+               Math.abs(worldX - e.x) * 640 <= weapon.splashRadius) {
+      // X-only fallback: clicking the upper silhouette of a sea entity unprojects
+      // to a depth shallower than the hull, so Manhattan dd >> splashRadius.
+      // If horizontal position matches, count as a hit regardless of depth.
+      applyDamage(game, e, weapon.damage);
     }
   }
   if (weapon.targetDomains.includes('crate')) {

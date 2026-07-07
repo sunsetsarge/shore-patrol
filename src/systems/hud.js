@@ -2,6 +2,7 @@
 // bar, streak multiplier, "AMMO" flash on empty-fire attempt.
 import * as Turret from '../engine/turret.js';
 import { currentWaveInfo } from './waveDirector.js';
+import { drawTierStrip } from './upgradeSystem.js';
 
 // Text with a dark drop shadow for legibility over the bright sky/sand.
 function st(ctx, text, x, y) {
@@ -15,6 +16,7 @@ function st(ctx, text, x, y) {
 export function render(ctx, game) {
   drawDefenseBar(ctx, game);
   drawScorePanel(ctx, game);
+  drawTierStrip(ctx, game);   // weapon upgrade tiers above the pips
   drawWeaponPips(ctx, game);
   drawWaveInfo(ctx, game);
   drawEmptyFlash(ctx, game);

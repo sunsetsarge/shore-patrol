@@ -1,0 +1,10 @@
+{
+  "projects": { "default": "claude-5273b" },
+  "targets": {
+    "claude-5273b": {
+      "hosting": {
+        "shore-patrol": ["shore-patrol"]
+      }
+    }
+  }
+}

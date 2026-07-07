@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "site": "shore-patrol",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      "meshy_test/**",
+      "**/*.md",
+      "**/*.bat",
+      "**/*.ps1",
+      "**/*.py",
+      "**/*.glb",
+      "**/*.log",
+      "**/*.txt"
+    ]
+  }
+}

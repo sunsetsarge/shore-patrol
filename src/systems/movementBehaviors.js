@@ -63,6 +63,8 @@ export const movementBehaviors = {
           if (entity.type.fireDamage > 0) {
             api.damageBase(entity.type.fireDamage);
             api.notifyVolley(entity);
+            // FIX 6: muzzle flash at the helicopter when it fires
+            api.notifyEnemyFire && api.notifyEnemyFire(entity);
           }
         }
       }
@@ -71,24 +73,37 @@ export const movementBehaviors = {
   },
 
   land_then_disgorge(entity, dt, api) {
+    // FIX 3: craft beaches permanently; troops trickle out one by one.
     const speed = entity.type.speed * api.difficulty.speed;
     const landD = 0.10;
-    if (!entity.flags.landed) {
+
+    if (!entity.flags.beached) {
+      // Approaching — move toward shore
       entity.d -= speed * dt;
       if (entity.d <= landD) {
         entity.d = landD;
-        entity.flags.landed = true;
-        entity.flags.pauseTimer = 0;
+        entity.flags.beached = true;
+        entity.flags.rampDown  = true;  // visual: ramp drops
+        entity.flags.rampTimer = 0.5;   // delay before first troop emerges
+        const sd = entity.type.spawnsOnDeath;
+        entity.flags.troopsToSpawn  = sd ? sd.count : 0;
+        entity.flags.troopInterval  = 0.35; // seconds between each soldier
       }
     } else {
-      entity.flags.pauseTimer += dt;
-      if (entity.flags.pauseTimer >= 1.0) {
-        // self-disgorge: despawn without score. spawnSystem fires
-        // spawnsOnDeath generically off flags.landed (set above), never for
-        // player kills.
-        entity.dead = true;
-        entity.suppressScore = true;
+      // Beached — trickle troops out one at a time
+      if (entity.flags.troopsToSpawn > 0) {
+        entity.flags.rampTimer -= dt;
+        if (entity.flags.rampTimer <= 0) {
+          const sd = entity.type.spawnsOnDeath;
+          if (sd) {
+            // Spawn exactly one troop per tick (override count to 1)
+            api.spawnChildren(entity, Object.assign({}, sd, { count: 1 }));
+          }
+          entity.flags.troopsToSpawn--;
+          entity.flags.rampTimer = entity.flags.troopInterval;
+        }
       }
+      // Craft stays beached permanently — no entity.dead = true here.
     }
   },
 };

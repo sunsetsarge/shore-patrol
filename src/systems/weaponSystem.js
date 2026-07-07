@@ -1,6 +1,6 @@
 // Reads weapons.json-derived defs. fireModeHandlers registry dispatches on
 // the `fireMode` schema field — no weapon id branching anywhere in this file.
-import { project, unprojectD, unprojectX, resolveSpritePath } from '../engine/renderer.js';
+import { project, unprojectD, unprojectX, resolveSpritePath, CONSTANTS } from '../engine/renderer.js';
 import { screenDistance, withinSplash } from '../engine/collision.js';
 import * as Turret from '../engine/turret.js';
 import * as Sprites from '../engine/sprites.js';
@@ -32,6 +32,10 @@ function pointHitsSprite(px, py, sx, sy, scale, hitbox, spriteScale, domain, img
   if (domain === 'air') {
     top = sy - drawH / 2;
     bottom = sy + drawH / 2;
+  } else if (domain === 'sea') {
+    // FIX 1: sea sprites are hull-centre-anchored (55 % above sy, 45 % below)
+    top    = sy - drawH * 0.55;
+    bottom = sy + drawH * 0.45;
   } else {
     top = sy - drawH;
     bottom = sy;
@@ -139,6 +143,40 @@ function splashDamage(game, weapon, worldX, worldD) {
   }
 }
 
+// FIX 5: spawn screen-space splash particles at an impact screen position.
+// Detects water vs sand by comparing screenY to the background band boundaries.
+function spawnImpactSplash(game, screenX, screenY) {
+  if (!game.splashes) return;
+  const { HORIZON_Y, SEA_Y } = CONSTANTS;
+  const inWater = screenY >= HORIZON_Y && screenY < SEA_Y;
+  const inSand  = screenY >= SEA_Y;
+  if (!inWater && !inSand) return;
+  const color = inWater ? '#88ccee' : '#c8b880';
+  const count = inWater ? 9 : 7;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.PI + Math.random() * Math.PI; // downward-to-upward arc
+    const speed = 35 + Math.random() * 55;
+    const maxLife = 0.28 + Math.random() * 0.28;
+    game.splashes.push({
+      x: screenX + (Math.random() - 0.5) * 6,
+      y: screenY,
+      vx: Math.cos(angle) * speed * 0.55,
+      vy: Math.sin(angle) * speed - 15,
+      life: maxLife, maxLife,
+      r: 1.5 + Math.random() * 2.5,
+      color,
+    });
+  }
+  // Base splash circle (briefly visible)
+  game.splashes.push({
+    x: screenX, y: screenY,
+    vx: 0, vy: 0,
+    life: 0.12, maxLife: 0.12,
+    r: inWater ? 9 : 7,
+    color,
+  });
+}
+
 export const fireModeHandlers = {
   auto(game, weapon, turret) {
     fireHitscan(game, weapon, turret);
@@ -168,6 +206,9 @@ function fireHitscan(game, weapon, turret) {
     } else {
       applyDamage(game, target, weapon.damage);
     }
+  } else {
+    // FIX 5: missed shot — splash at cursor impact point (water or sand)
+    spawnImpactSplash(game, turret.aimX, turret.aimY);
   }
   game.audio && game.audio.play(weapon.sound);
 }
@@ -252,6 +293,9 @@ export function update(game, dt) {
         p.done = true;
         splashDamage(game, p.weapon, p.targetX, p.targetD);
         game.effects.push({ kind: 'explosion', x: p.targetX, d: p.targetD, alt: p.domain === 'air' ? 0.5 : 0, domain: p.domain, radiusWorld: p.weapon.splashRadius, life: 0.4, age: 0 });
+        // FIX 5: spawn water/sand splash at screen-projected impact point
+        const { sx: isx, sy: isy } = project(p.targetX, p.targetD, 0, p.domain);
+        spawnImpactSplash(game, isx, isy);
       }
     } else if (p.kind === 'missile') {
       const speed = p.weapon.projectileSpeed * dt;
@@ -286,6 +330,30 @@ export function update(game, dt) {
   // age effects
   for (const fx of game.effects) fx.age += dt;
   game.effects = game.effects.filter(fx => fx.age < fx.life);
+
+  // FIX 4: update explosion particles (screen-space physics)
+  if (game.particles) {
+    for (let i = game.particles.length - 1; i >= 0; i--) {
+      const p = game.particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 80 * dt; // gravity pulls sparks down
+      p.life -= dt;
+      if (p.life <= 0) game.particles.splice(i, 1);
+    }
+  }
+
+  // FIX 5: update splash particles (screen-space physics)
+  if (game.splashes) {
+    for (let i = game.splashes.length - 1; i >= 0; i--) {
+      const sp = game.splashes[i];
+      sp.x += sp.vx * dt;
+      sp.y += sp.vy * dt;
+      sp.vy += 60 * dt; // gravity
+      sp.life -= dt;
+      if (sp.life <= 0) game.splashes.splice(i, 1);
+    }
+  }
 }
 
 export function handleInputEvent(game, evt) {

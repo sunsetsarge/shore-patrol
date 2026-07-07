@@ -3,6 +3,7 @@
 // definitions by id from the loaded enemies.json map.
 import { createEntity } from '../engine/entity.js';
 import { movementBehaviors } from './movementBehaviors.js';
+import { project } from '../engine/renderer.js';
 
 let enemyDefsById = {};
 
@@ -12,6 +13,44 @@ export function init(game, data) {
     enemyDefsById[e.id] = e;
   }
   game.entities = [];
+  game.particles = [];  // FIX 4: screen-space explosion particles
+  game.splashes  = [];  // FIX 5: screen-space impact splash particles
+}
+
+// FIX 4: spawn screen-space explosion particles at (sx, sy).
+// sizeMultiplier > 1 for large vehicles (tanks, landing craft).
+function spawnExplosionParticles(particles, sx, sy, sizeMultiplier) {
+  const sm = sizeMultiplier || 1.0;
+  const count = Math.floor(12 * sm);
+  const fireColors = ['#ff6600', '#ffcc00', '#cc2200', '#ff8800'];
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (30 + Math.random() * 60) * sm;
+    const maxLife = 0.5 + Math.random() * 0.5;
+    particles.push({
+      x: sx, y: sy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: maxLife, maxLife,
+      r: (2 + Math.random() * 4) * sm,
+      color: fireColors[Math.floor(Math.random() * fireColors.length)],
+      smoke: false,
+    });
+  }
+  // Black smoke puffs
+  for (let i = 0; i < 5; i++) {
+    const maxLife = 1.0 + Math.random() * 0.5;
+    particles.push({
+      x: sx + (Math.random() - 0.5) * 20 * sm,
+      y: sy - Math.random() * 10 * sm,
+      vx: (Math.random() - 0.5) * 20,
+      vy: -20 - Math.random() * 30,
+      life: maxLife, maxLife,
+      r: (7 + Math.random() * 10) * sm,
+      color: '#1e1e1e',
+      smoke: true,
+    });
+  }
 }
 
 function makeEnemyEntity(enemyId, x, d, difficulty) {
@@ -67,6 +106,10 @@ export function update(game, dt) {
     notifyVolley(entity) {
       game.effects.push({ kind: 'explosion', x: entity.x, d: entity.d, alt: entity.alt, domain: 'land', radiusWorld: 30, life: 0.3, age: 0 });
     },
+    // FIX 6: enemy fires — muzzle flash at the entity's world position
+    notifyEnemyFire(entity) {
+      game.effects.push({ kind: 'enemy_muzzle', x: entity.x, d: entity.d, alt: entity.alt, domain: entity.type.domain, life: 0.12, age: 0 });
+    },
     spawnChildren(entity, spawnsOnDeath) {
       spawnChildren(game, entity, spawnsOnDeath, api.difficulty);
     },
@@ -107,6 +150,10 @@ export function update(game, dt) {
         game.scoreApi && game.scoreApi.onKill(e.type.scoreValue);
         game.audio && game.audio.play('explode');
         game.effects.push({ kind: 'explosion', x: e.x, d: e.d, alt: e.alt, domain: e.type.domain, radiusWorld: 60, life: 0.4, age: 0 });
+        // FIX 4: spawn screen-space explosion particles at projected position
+        const { sx, sy } = project(e.x, e.d, e.alt, e.type.domain);
+        const sm = e.type.hitbox > 30 ? 1.5 : 1.0;
+        spawnExplosionParticles(game.particles, sx, sy, sm);
       }
     }
   }
@@ -120,7 +167,10 @@ export function update(game, dt) {
   for (const e of game.entities) {
     if (e.dead && !e.processedDeath) {
       e.processedDeath = true;
-      if (e.flags.landed && e.type.spawnsOnDeath) {
+      // FIX 3: beached ships already trickle-spawned their troops via the
+      // movement behavior; skip the death-chain spawn so troops don't
+      // double-appear when a beached craft is shot.
+      if (e.flags.landed && !e.flags.beached && e.type.spawnsOnDeath) {
         spawnChildren(game, e, e.type.spawnsOnDeath, api.difficulty);
       }
     }

@@ -137,17 +137,73 @@ const glyphRegistry = {
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.strokeRect(sx - s * 0.7, sy - s * 0.3, s * 1.4, s * 0.5);
   },
-  boat(ctx, sx, sy, scale, color) {
-    const s = 46 * scale;
-    ctx.fillStyle = color;
+  boat(ctx, sx, sy, scale, color, entity) {
+    // LCVP / Higgins boat — 3/4-above view.
+    // Bow (ramp side) faces SHORE = bottom of screen (sy); stern toward horizon (top).
+    const rampDown = entity && entity.flags && entity.flags.rampDown;
+    const w = 34 * scale;   // hull beam
+    const h = 22 * scale;   // hull depth stern→bow on screen
+
+    // Hull body — tapered at stern, square at bow
+    ctx.fillStyle = '#56563a';
     ctx.beginPath();
-    ctx.moveTo(sx - s * 0.8, sy);
-    ctx.lineTo(sx - s * 0.55, sy - s * 0.35);
-    ctx.lineTo(sx + s * 0.55, sy - s * 0.35);
-    ctx.lineTo(sx + s * 0.8, sy);
+    ctx.moveTo(sx - w * 0.48, sy);           // bow port
+    ctx.lineTo(sx - w * 0.50, sy - h * 0.80); // port mid
+    ctx.lineTo(sx - w * 0.40, sy - h);        // stern port
+    ctx.lineTo(sx + w * 0.40, sy - h);        // stern star
+    ctx.lineTo(sx + w * 0.50, sy - h * 0.80); // star mid
+    ctx.lineTo(sx + w * 0.48, sy);            // bow star
     ctx.closePath();
     ctx.fill();
-    ctx.fillRect(sx - s * 0.25, sy - s * 0.6, s * 0.5, s * 0.3);
+
+    // Gunwale outline
+    ctx.strokeStyle = '#3a3a28';
+    ctx.lineWidth = Math.max(1, scale * 1.5);
+    ctx.stroke();
+
+    // Vertical rib lines along hull
+    ctx.strokeStyle = '#44442e';
+    ctx.lineWidth = Math.max(0.5, scale * 0.8);
+    for (let i = 1; i < 4; i++) {
+      const rx = sx - w * 0.44 + i * (w * 0.88 / 4);
+      ctx.beginPath();
+      ctx.moveTo(rx, sy - h * 0.05);
+      ctx.lineTo(rx, sy - h * 0.90);
+      ctx.stroke();
+    }
+
+    // Engine housings at stern corners
+    ctx.fillStyle = '#303020';
+    const eW = w * 0.18, eH = h * 0.14;
+    ctx.fillRect(sx - w * 0.50, sy - h - eH, eW, eH);
+    ctx.fillRect(sx + w * 0.50 - eW, sy - h - eH, eW, eH);
+
+    // Bow ramp
+    ctx.fillStyle = '#484830';
+    if (rampDown) {
+      // Ramp dropped flat ahead of bow onto beach/water
+      const rampW = w * 0.75;
+      ctx.fillRect(sx - rampW / 2, sy, rampW, Math.max(3, 7 * scale));
+      ctx.strokeStyle = '#28281a';
+      ctx.lineWidth = Math.max(1, scale);
+      ctx.beginPath();
+      ctx.moveTo(sx - rampW / 2, sy + scale);
+      ctx.lineTo(sx + rampW / 2, sy + scale);
+      ctx.stroke();
+    } else {
+      // Ramp upright at bow face
+      ctx.fillRect(sx - w * 0.44, sy - h * 0.18, w * 0.88, Math.max(2, h * 0.12));
+      // Ramp slat lines
+      ctx.strokeStyle = '#282818';
+      ctx.lineWidth = Math.max(0.5, scale * 0.7);
+      for (let j = 1; j < 3; j++) {
+        const ry = sy - h * 0.18 + j * (h * 0.12 / 3);
+        ctx.beginPath();
+        ctx.moveTo(sx - w * 0.44, ry);
+        ctx.lineTo(sx + w * 0.44, ry);
+        ctx.stroke();
+      }
+    }
   },
   heli(ctx, sx, sy, scale, color, entity) {
     const s = 34 * scale;
@@ -204,8 +260,14 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
     if (domain === 'air') {
       // center-anchored at (sx, sy)
       ctx.drawImage(img, sx - drawW / 2, sy - drawH / 2, drawW, drawH);
+    } else if (domain === 'sea') {
+      // FIX 1: sea sprites hull-centre-anchored so ships straddle the
+      // horizon line at spawn (d=1) instead of appearing entirely in the sky.
+      // 55 % of hull height sits above sy (above-water superstructure),
+      // 45 % below (keel below the waterline).
+      ctx.drawImage(img, sx - drawW / 2, sy - drawH * 0.55, drawW, drawH);
     } else {
-      // bottom-anchored at (sx, sy) for land/sea domains
+      // land: bottom-anchored — feet/tracks sit at sy
       ctx.drawImage(img, sx - drawW / 2, sy - drawH, drawW, drawH);
     }
   } else {
@@ -563,6 +625,64 @@ export function drawReticle(ctx, x, y, shape, color) {
     ctx.fillStyle = color;
     ctx.fill();
   }
+  ctx.restore();
+}
+
+// -------------------- FIX 4: explosion particle draw --------------------
+export function drawParticles(ctx, particles) {
+  for (const p of particles) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (p.smoke) {
+      ctx.fillStyle = `rgba(30,30,30,${alpha})`;
+    } else {
+      ctx.fillStyle = p.color;
+    }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(0.5, p.r), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// -------------------- FIX 5: impact splash draw --------------------
+export function drawSplashes(ctx, splashes) {
+  for (const sp of splashes) {
+    const alpha = Math.max(0, sp.life / sp.maxLife);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = sp.color;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, Math.max(0.5, sp.r), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// -------------------- FIX 6: enemy muzzle flash draw --------------------
+// Called for helicopter / enemy fire. sx/sy are projected screen coords.
+export function drawEnemyMuzzleFlash(ctx, sx, sy, scale, alpha) {
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, alpha);
+  const r = Math.max(4, 14 * scale);
+  // Outer glow
+  const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+  grad.addColorStop(0, 'rgba(255,240,60,1)');
+  grad.addColorStop(0.5, 'rgba(255,120,0,0.6)');
+  grad.addColorStop(1, 'rgba(255,60,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(sx, sy, r, 0, Math.PI * 2);
+  ctx.fill();
+  // Bright core
+  ctx.globalAlpha = alpha * 0.9;
+  ctx.fillStyle = 'rgba(255,255,200,1)';
+  ctx.beginPath();
+  ctx.arc(sx, sy, r * 0.28, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 

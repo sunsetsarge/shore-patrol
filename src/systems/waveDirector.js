@@ -98,7 +98,9 @@ export function update(game, dt) {
   const allSpawned = waveDef.spawns.every((s, i) => ws.spawnProgress[i].spawned >= s.count);
   // Dying entities (playing a one-shot death animation) are excluded from the
   // cleared count — a lingering corpse must not block wave progression.
-  const cleared = allSpawned && game.entities.filter(e => !e.dead && !e.dying).length === 0;
+  // FIX 3: beached landing craft stay on the beach permanently; exclude them
+  // from the "all enemies cleared" count so waves still advance.
+  const cleared = allSpawned && game.entities.filter(e => !e.dead && !e.dying && !e.flags.beached).length === 0;
   const timeUp = ws.timeInWave >= waveDef.duration;
 
   if (cleared || timeUp) {

@@ -210,7 +210,21 @@ function renderPlaying(ctx, game) {
       Renderer.drawTracer(ctx, fx.x1, fx.y1, fx.x2, fx.y2, fx.color, 1 - t01);
     } else if (fx.kind === 'muzzle') {
       Renderer.drawMuzzleFlash(ctx, game.turret, 1 - t01);
+    } else if (fx.kind === 'enemy_muzzle') {
+      // FIX 6: enemy fires — flash at the entity's projected screen position
+      const { sx, sy, scale } = Renderer.project(fx.x, fx.d, fx.alt, fx.domain || 'air');
+      Renderer.drawEnemyMuzzleFlash(ctx, sx, sy, scale, 1 - t01);
     }
+  }
+
+  // FIX 4: explosion particle debris
+  if (game.particles && game.particles.length > 0) {
+    Renderer.drawParticles(ctx, game.particles);
+  }
+
+  // FIX 5: water/sand impact splashes
+  if (game.splashes && game.splashes.length > 0) {
+    Renderer.drawSplashes(ctx, game.splashes);
   }
 
   Renderer.drawTurret(ctx, game.turret);

@@ -2,17 +2,18 @@
 
 Updated: 2026-07-07 (session-handoff wrap)
 Status: ACTIVE
-Phase: Executing FINISH_PLAN.md — Phase A (rename) + Phase B (presentation), of 8 (A–H)
+Phase: FINISH_PLAN.md — Phase A + B DONE; next is Phase C (juice), of 8 (A–H)
 
 ## NEXT ACTION
-Execute FINISH_PLAN.md Phase A then Phase B: (A) replace the user-visible title "BEACHHEAD" with
-the shipping name in index.html + src/main.js menu + browser tab + README (leave repo folder +
-internal ids alone; acceptance = new title in menu & tab, `grep -rin beachhead src/ index.html`
-finds only non-display refs, zero console errors); (B) make the 1280×720 canvas scale to fill the
-viewport preserving 16:9 (object-fit contain, dark letterbox, full-viewport wrapper), add F
-fullscreen, enlarge HUD ~40% with text-shadow, polish menu (acceptance = fills window at 1920×1080
-& 1280×720, mouse aim still lands on target via debugStep probe, F toggles fullscreen, before/after
-screenshots, zero console errors).
+Execute FINISH_PLAN.md Phase C (juice pass): add screenshake (game.shake scalar, world-draw
+translate, decay), hit-flash (entity.hitFlash white tint on damage), impact particles (generic
+world-space system, cap ~300, dust/spark/splash/debris by domain), bigger muzzle+recoil+MG
+tracers, score popups (+N floats on kill), optional hit-stop — ALL magnitudes in a new
+data/juice.json (no per-enemy/weapon id branching, grep contract holds). Acceptance = howitzer
+impact shakes screen + throws particles, hits flash white, kills spawn floating score, changing a
+data/juice.json value changes the effect on reload, smooth with ~40 entities+particles, zero
+console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding), F (asset diet
+256px+WebP <2MB), G (single-file build — add loader shims first), H (itch package).
 
 ## BLAINE GATES
 - [ ] Confirm the shipping NAME before any public/monetized publish (agent default placeholder:
@@ -36,12 +37,14 @@ screenshots, zero console errors).
   (Phase F) first: downscale 256px + WebP → <2MB.
 
 ## DONE (verified this session, 2026-07-07)
-- Live screenshot test (menu/combat/death/pause) — game verified as a working vertical slice.
-- STATUS.md, FINISH_PLAN.md (8 phases, lesser-model-executable), ROADMAP.md written + committed
-  (@70ae684) + mirrored to OneDrive.
-- Research complete (verified URLs): no finishable clone; itch takes lone .html; ZzFX audio;
-  juice refs; portal size bars (Poki <8MB init tightest).
-- Confluence eval page 82935817 created (renders correctly via html contentFormat).
+- Live screenshot test → game verified as a working vertical slice; STATUS/FINISH_PLAN/ROADMAP
+  written + committed + OneDrive-mirrored; research done; Confluence eval page 82935817.
+- **Phase A (rename) DONE @70ceee9**: GAME_TITLE='SHORE PATROL' constant in main.js drives menu +
+  tab + README; internal ids/folder/localStorage unchanged; grep clean. Verified tab+menu title.
+- **Phase B (presentation) DONE @70ceee9**: full-bleed canvas (removed DOM chrome, image-rendering
+  auto), F fullscreen, menu subtitle+legend, HUD +40% w/ shadows, stronger active-weapon pip.
+  Verified: canvas fills viewport height, mouse-aim-at-center still hits (tank 120→116), 0 errors.
+- NAME is still a Blaine gate: "SHORE PATROL" is a placeholder; confirm before public publish.
 
 ## UNVERIFIED
 - (none)

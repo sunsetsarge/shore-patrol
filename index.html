@@ -34,6 +34,38 @@
   <canvas id="game-canvas" width="1280" height="720"></canvas>
 </div>
 <script type="module" src="/src/main.js"></script>
+
+<!-- SunsetSarge easter egg — click to toggle debug mode -->
+<span id="ssEgg" style="position:fixed;bottom:12px;right:14px;
+  color:rgba(255,255,255,0.3);font-size:11px;font-family:monospace;
+  cursor:pointer;user-select:none;transition:color 0.3s,text-shadow 0.3s;z-index:100;">
+  SunsetSarge
+</span>
+
+<!-- Debug panel — visible only when debug mode active and game is playing -->
+<div id="debugPanel" style="display:none;position:fixed;top:8px;left:8px;
+  background:rgba(0,0,0,0.85);border:1px solid #555;border-radius:6px;
+  padding:10px 14px;z-index:9999;color:#eee;font-family:monospace;font-size:12px;
+  min-width:200px;">
+  <div style="color:#ffd700;font-weight:bold;margin-bottom:8px;">🐛 Debug Mode</div>
+  <div style="display:flex;flex-direction:column;gap:5px;">
+    <button class="dbg-btn" id="dbg-spawn-infantry">👥 Spawn Infantry Wave</button>
+    <button class="dbg-btn" id="dbg-spawn-tank">🚗 Spawn Tank</button>
+    <button class="dbg-btn" id="dbg-spawn-heli">🚁 Spawn Helicopter</button>
+    <button class="dbg-btn" id="dbg-spawn-boat">⛵ Spawn Landing Craft</button>
+    <button class="dbg-btn" id="dbg-ammo">📦 Spawn Ammo Crate</button>
+    <button class="dbg-btn" id="dbg-next-round">⏭ Next Round</button>
+    <button class="dbg-btn" id="dbg-god-mode">🛡 God Mode: OFF</button>
+    <button class="dbg-btn" id="dbg-kill-all">💀 Kill All Enemies</button>
+  </div>
+</div>
+<style>
+.dbg-btn{background:#222;border:1px solid #555;border-radius:3px;
+  color:#eee;font-family:monospace;font-size:11px;
+  padding:4px 8px;cursor:pointer;text-align:left;}
+.dbg-btn:hover{background:#333;border-color:#888;}
+</style>
+
 <script>
   // Scale the 1280x720 canvas to fill the viewport while preserving 16:9,
   // without touching its internal resolution (the projection math assumes 1280x720).
@@ -64,6 +96,59 @@
     }
   });
   document.addEventListener('fullscreenchange', resizeCanvas);
+
+  // ---- SunsetSarge easter egg + debug panel ----
+  let debugMode = false;
+
+  document.getElementById('ssEgg').addEventListener('click', () => {
+    debugMode = !debugMode;
+    const el = document.getElementById('ssEgg');
+    if (debugMode) {
+      el.style.color = 'rgba(255,210,0,0.95)';
+      el.style.textShadow = '0 0 8px rgba(255,180,0,0.8)';
+    } else {
+      el.style.color = 'rgba(255,255,255,0.3)';
+      el.style.textShadow = 'none';
+      // reset god mode when debug turned off
+      if (window.game) window.game.godMode = false;
+      document.getElementById('dbg-god-mode').textContent = '🛡 God Mode: OFF';
+    }
+  });
+
+  // Poll game state to show/hide debug panel
+  (function pollDebugPanel() {
+    const panel = document.getElementById('debugPanel');
+    const g = window.game;
+    panel.style.display = (debugMode && g && g.state === 'playing') ? 'block' : 'none';
+    requestAnimationFrame(pollDebugPanel);
+  })();
+
+  function safeDebug(fn) {
+    const g = window.game;
+    if (g && g.debug) fn(g.debug);
+  }
+
+  document.getElementById('dbg-spawn-infantry').addEventListener('click',
+    () => safeDebug(d => d.spawnInfantry()));
+  document.getElementById('dbg-spawn-tank').addEventListener('click',
+    () => safeDebug(d => d.spawnTank()));
+  document.getElementById('dbg-spawn-heli').addEventListener('click',
+    () => safeDebug(d => d.spawnHeli()));
+  document.getElementById('dbg-spawn-boat').addEventListener('click',
+    () => safeDebug(d => d.spawnBoat()));
+  document.getElementById('dbg-ammo').addEventListener('click',
+    () => safeDebug(d => d.spawnAmmo()));
+  document.getElementById('dbg-next-round').addEventListener('click',
+    () => safeDebug(d => d.nextRound()));
+  document.getElementById('dbg-kill-all').addEventListener('click',
+    () => safeDebug(d => d.killAll()));
+  document.getElementById('dbg-god-mode').addEventListener('click', () => {
+    safeDebug(d => {
+      const on = d.toggleGodMode();
+      document.getElementById('dbg-god-mode').textContent =
+        `🛡 God Mode: ${on ? 'ON' : 'OFF'}`;
+    });
+  });
 </script>
 </body>
 </html>

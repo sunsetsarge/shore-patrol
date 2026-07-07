@@ -17,6 +17,75 @@ export function init(game, data) {
   game.splashes  = [];  // FIX 5: screen-space impact splash particles
 }
 
+// FIX 1: infantry/commando collapse — small red splat + sandy dust, no fire.
+function spawnCollapseEffect(particles, sx, sy) {
+  // Blood splat droplets
+  for (let i = 0; i < 5; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 15 + Math.random() * 25;
+    particles.push({
+      x: sx, y: sy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 20,
+      life: 0.4 + Math.random() * 0.3,
+      maxLife: 0.7,
+      r: 1.5 + Math.random() * 2,
+      color: '#8b1a1a',
+      smoke: false,
+    });
+  }
+  // Sandy dust puffs
+  for (let i = 0; i < 3; i++) {
+    particles.push({
+      x: sx + (Math.random() - 0.5) * 10, y: sy,
+      vx: (Math.random() - 0.5) * 15,
+      vy: -10 - Math.random() * 15,
+      life: 0.5, maxLife: 0.5,
+      r: 4 + Math.random() * 4,
+      color: 'rgba(180,160,120,0.8)',
+      smoke: false,
+    });
+  }
+}
+
+// FIX 2: landing craft/boat sinking in water — water column + foam ring + black smoke.
+// Water droplets go into splashes (color-correct), burning wreck smoke into particles.
+function spawnBoatSinkSplash(particles, splashes, sx, sy) {
+  // Large upward water column
+  for (let i = 0; i < 20; i++) {
+    const angle = -Math.PI + Math.random() * Math.PI; // upward arc
+    const speed = 80 + Math.random() * 120;
+    splashes.push({
+      x: sx + (Math.random() - 0.5) * 30,
+      y: sy,
+      vx: Math.cos(angle) * speed * 0.5,
+      vy: Math.sin(angle) * speed - 60,
+      life: 0.8 + Math.random() * 0.5,
+      maxLife: 1.3,
+      r: 4 + Math.random() * 8,
+      color: Math.random() < 0.6 ? '#aaddff' : '#ffffff',
+    });
+  }
+  // Foam ring at base
+  splashes.push({
+    x: sx, y: sy, vx: 0, vy: 0,
+    life: 0.6, maxLife: 0.6,
+    r: 35, color: 'rgba(200,230,255,0.7)',
+  });
+  // Black smoke from burning wreck
+  for (let i = 0; i < 4; i++) {
+    particles.push({
+      x: sx + (Math.random() - 0.5) * 20, y: sy - 10,
+      vx: (Math.random() - 0.5) * 10,
+      vy: -30 - Math.random() * 20,
+      life: 1.2, maxLife: 1.2,
+      r: 10 + Math.random() * 8,
+      color: '#1e1e1e',
+      smoke: true,
+    });
+  }
+}
+
 // FIX 4: spawn screen-space explosion particles at (sx, sy).
 // sizeMultiplier > 1 for large vehicles (tanks, landing craft).
 function spawnExplosionParticles(particles, sx, sy, sizeMultiplier) {
@@ -99,6 +168,7 @@ export function update(game, dt) {
   const api = {
     difficulty: game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 },
     damageBase(amount) {
+      if (game.godMode) return; // debug god mode
       game.defense = Math.max(0, game.defense - amount);
       game.scoreApi && game.scoreApi.onBaseDamage();
       game.audio && game.audio.play('hit');
@@ -148,12 +218,26 @@ export function update(game, dt) {
       e.processedKill = true;
       if (e.killedByPlayer && !e.suppressScore) {
         game.scoreApi && game.scoreApi.onKill(e.type.scoreValue);
-        game.audio && game.audio.play('explode');
-        game.effects.push({ kind: 'explosion', x: e.x, d: e.d, alt: e.alt, domain: e.type.domain, radiusWorld: 60, life: 0.4, age: 0 });
-        // FIX 4: spawn screen-space explosion particles at projected position
         const { sx, sy } = project(e.x, e.d, e.alt, e.type.domain);
-        const sm = e.type.hitbox > 30 ? 1.5 : 1.0;
-        spawnExplosionParticles(game.particles, sx, sy, sm);
+
+        const isInfantry  = e.type.shape === 'biped';
+        const isBoatAtSea = e.type.domain === 'sea' && !e.flags.beached;
+
+        if (isInfantry) {
+          // FIX 1: infantry/commando — collapse effect, no explosion, no 'explode' sfx
+          spawnCollapseEffect(game.particles, sx, sy);
+        } else if (isBoatAtSea) {
+          // FIX 2: boat destroyed in water — water splash instead of fire explosion
+          game.audio && game.audio.play('explode');
+          spawnBoatSinkSplash(game.particles, game.splashes, sx, sy);
+        } else {
+          // tanks, helicopters, beached boats — fire explosion as before
+          game.audio && game.audio.play('explode');
+          game.effects.push({ kind: 'explosion', x: e.x, d: e.d, alt: e.alt, domain: e.type.domain, radiusWorld: 60, life: 0.4, age: 0 });
+          // FIX 4: screen-space explosion particles
+          const sm = e.type.hitbox > 30 ? 1.5 : 1.0;
+          spawnExplosionParticles(game.particles, sx, sy, sm);
+        }
       }
     }
   }

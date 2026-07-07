@@ -114,6 +114,13 @@ function doSpawn(game, spawnDef, difficulty) {
   SpawnSystem.spawnEnemy(game, spawnDef.enemyId, x, d, difficulty);
 }
 
+// Debug helper: skip immediately to the next wave.
+export function debugForceNextWave(game) {
+  const ws = game.waveState;
+  if (!ws) return;
+  startWave(game, ws.index + 1);
+}
+
 export function currentWaveInfo(game) {
   const ws = game.waveState;
   const waveDef = currentWaveDef(ws);

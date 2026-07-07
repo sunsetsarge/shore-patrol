@@ -25,7 +25,10 @@ const HIT_PAD = 6;
 // for air, height = hitbox*2.4*scale*spriteScale, width from the loaded
 // image's aspect ratio. `domain` null/undefined is treated as non-air
 // (bottom-anchored), matching drawEntityGlyph's `domain === 'air'` check.
-function pointHitsSprite(px, py, sx, sy, scale, hitbox, spriteScale, domain, img) {
+// FIX 3: entityD allows sea hitbox to mirror renderer.js's depth-varying
+// seaAnchor formula exactly: lerp(-0.2, 0.55, 1 - d01sea).
+// Without this, hitboxes near the horizon were far above the visible hull.
+function pointHitsSprite(px, py, sx, sy, scale, hitbox, spriteScale, domain, img, entityD) {
   const drawH = hitbox * 2.4 * scale * (spriteScale || 1);
   const drawW = drawH * (img.naturalWidth / img.naturalHeight);
   let top, bottom;
@@ -33,9 +36,13 @@ function pointHitsSprite(px, py, sx, sy, scale, hitbox, spriteScale, domain, img
     top = sy - drawH / 2;
     bottom = sy + drawH / 2;
   } else if (domain === 'sea') {
-    // FIX 1: sea sprites are hull-centre-anchored (55 % above sy, 45 % below)
-    top    = sy - drawH * 0.55;
-    bottom = sy + drawH * 0.45;
+    // Match renderer.js sea anchor: lerp(-0.2, 0.55, 1 - d01sea)
+    // At d=0 (shore): seaAnchor=0.55  → sprite straddles waterline correctly
+    // At d=1 (horizon): seaAnchor=-0.2 → sprite drawn below sy, hull in water
+    const d01sea = Math.max(0, Math.min(1, entityD || 0));
+    const seaAnchor = -0.2 + 0.75 * (1 - d01sea);
+    top    = sy - drawH * seaAnchor;
+    bottom = top + drawH;
   } else {
     top = sy - drawH;
     bottom = sy;
@@ -74,7 +81,7 @@ function projectedHitTest(game, weapon, screenX, screenY) {
     const img = spritePath ? Sprites.get(spritePath) : null;
     let hit;
     if (img) {
-      hit = pointHitsSprite(screenX, screenY, sx, sy, scale, e.type.hitbox, e.type.spriteScale, domain, img);
+      hit = pointHitsSprite(screenX, screenY, sx, sy, scale, e.type.hitbox, e.type.spriteScale, domain, img, e.d);
     } else {
       // fallback circle: centered at (sy - hitbox*scale) for land/sea, current
       // (center-anchored) behavior for air.

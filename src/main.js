@@ -112,8 +112,80 @@ function createGame(canvas, ctx, data, audio) {
     defense: 100,
     state: 'menu', // menu | playing | paused | gameover
     time: 0,
+    // Ambient visual state — always active, survive game resets
+    whitecaps: [],
+    whitecapTimer: 0,
+    clouds: [],
+    tidalPhase: 0,
+    // Debug
+    godMode: false,
   };
   return game;
+}
+
+// ---- Ambient visual helpers (clouds, whitecaps, tidal) ----
+
+function makeCloud(x) {
+  return {
+    x,
+    y: 20 + Math.random() * (HORIZON_Y * 0.6),
+    w: 80 + Math.random() * 120,
+    h: 25 + Math.random() * 35,
+    speed: 8 + Math.random() * 12,
+    alpha: 0.6 + Math.random() * 0.35,
+    puffs: Array.from({ length: 3 + Math.floor(Math.random() * 3) }, (_, i) => ({
+      dx: (i - 1.5) * 28,
+      dy: Math.random() * 12 - 6,
+      r: 18 + Math.random() * 18,
+    })),
+  };
+}
+
+const HORIZON_Y = 260;
+const SEA_Y_MAIN = 420;
+const CANVAS_W_MAIN = 1280;
+
+function initClouds(game) {
+  game.clouds = [];
+  for (let i = 0; i < 6; i++) {
+    game.clouds.push(makeCloud(Math.random() * CANVAS_W_MAIN));
+  }
+}
+
+function updateAmbience(game, dt) {
+  // Whitecaps
+  game.whitecapTimer -= dt;
+  if (game.whitecapTimer <= 0) {
+    game.whitecapTimer = 0.3 + Math.random() * 0.7;
+    const wx = Math.random() * CANVAS_W_MAIN;
+    const wy = HORIZON_Y + Math.random() * (SEA_Y_MAIN - HORIZON_Y);
+    const t = (wy - HORIZON_Y) / (SEA_Y_MAIN - HORIZON_Y);
+    const maxLife = 0.8 + Math.random() * 1.2;
+    game.whitecaps.push({
+      x: wx, y: wy,
+      w: (15 + Math.random() * 25) * (0.3 + t * 0.7),
+      h: (3 + Math.random() * 4) * (0.3 + t * 0.7),
+      life: maxLife, maxLife,
+      vx: -20 - Math.random() * 15,
+    });
+  }
+  for (let i = game.whitecaps.length - 1; i >= 0; i--) {
+    const w = game.whitecaps[i];
+    w.x += w.vx * dt;
+    w.life -= dt;
+    if (w.life <= 0) game.whitecaps.splice(i, 1);
+  }
+
+  // Clouds
+  for (const c of game.clouds) {
+    c.x -= c.speed * dt;
+    if (c.x + c.w < 0) {
+      Object.assign(c, makeCloud(CANVAS_W_MAIN + 100));
+    }
+  }
+
+  // Tidal phase — slow oscillation
+  game.tidalPhase += dt * 0.8;
 }
 
 function initSystems(game, data) {
@@ -133,6 +205,7 @@ function resetGame(game, data) {
 function update(game, dt) {
   if (game.state !== 'playing') return;
   game.time += dt;
+  if (game.godMode) game.defense = 100; // debug: full defense always
 
   const turret = game.turret;
   Turret.updateAim(turret, game.input.mouseX, game.input.mouseY);
@@ -166,6 +239,11 @@ function update(game, dt) {
 
 function renderPlaying(ctx, game) {
   Renderer.drawBackground(ctx, game.time);
+
+  // Ambient visuals — after background, before entities
+  if (game.clouds && game.clouds.length > 0) Renderer.drawClouds(ctx, game.clouds);
+  if (game.whitecaps && game.whitecaps.length > 0) Renderer.drawWhitecaps(ctx, game.whitecaps);
+  Renderer.drawTidal(ctx, game.tidalPhase || 0);
 
   // draw entities sorted far-to-near (by d desc) so nearer overlaps farther
   const drawList = [...game.entities, ...game.crates];
@@ -249,6 +327,9 @@ function shadowText(ctx, text, x, y) {
 
 function renderMenu(ctx, game) {
   Renderer.drawBackground(ctx, game.time);
+  if (game.clouds && game.clouds.length > 0) Renderer.drawClouds(ctx, game.clouds);
+  if (game.whitecaps && game.whitecaps.length > 0) Renderer.drawWhitecaps(ctx, game.whitecaps);
+  Renderer.drawTidal(ctx, game.tidalPhase || 0);
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(0, 0, 1280, 720);
@@ -356,7 +437,54 @@ async function main() {
   const game = createGame(canvas, ctx, data, audio);
   game.bestScore = ScoreSystem.loadBest();
   game.state = 'menu';
+  initClouds(game);
   window.game = game; // debug/inspection handle
+
+  // Debug API — accessed by index.html debug panel via window.game.debug
+  game.debug = {
+    spawnInfantry: () => {
+      if (game.state !== 'playing') return;
+      for (let i = 0; i < 4; i++) {
+        SpawnSystem.spawnEnemy(game, 'infantry', (Math.random() - 0.5) * 1.6, 0.7,
+          game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 });
+      }
+    },
+    spawnTank: () => {
+      if (game.state !== 'playing') return;
+      SpawnSystem.spawnEnemy(game, 'tank', (Math.random() - 0.5) * 1.2, 0.6,
+        game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 });
+    },
+    spawnHeli: () => {
+      if (game.state !== 'playing') return;
+      SpawnSystem.spawnEnemy(game, 'helicopter', (Math.random() - 0.5) * 1.2, 0.5,
+        game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 });
+    },
+    spawnBoat: () => {
+      if (game.state !== 'playing') return;
+      SpawnSystem.spawnEnemy(game, 'landing_craft', (Math.random() - 0.5) * 1.2, 1.0,
+        game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 });
+    },
+    spawnAmmo: () => {
+      if (game.state !== 'playing') return;
+      const crateIds = data.crates.crates.map(c => c.id);
+      if (crateIds.length > 0) CrateSystem.spawnCrate(game, crateIds);
+    },
+    nextRound: () => {
+      if (game.state !== 'playing') return;
+      WaveDirector.debugForceNextWave(game);
+    },
+    killAll: () => {
+      if (game.state !== 'playing') return;
+      for (const e of game.entities) {
+        if (!e.dead && !e.dying) e.hp = 0;
+      }
+    },
+    toggleGodMode: () => {
+      game.godMode = !game.godMode;
+      if (game.godMode) game.defense = 100;
+      return game.godMode;
+    },
+  };
 
   attachInput(canvas, game.input, () => audio.ensureStarted());
 
@@ -405,6 +533,9 @@ async function main() {
     if (dt > 0.25) dt = 0.25; // clamp huge tab-switch gaps
     accumulator += dt;
     if (accumulator > MAX_ACCUMULATED) accumulator = MAX_ACCUMULATED;
+
+    // Always update ambient visuals (clouds, whitecaps, tidal) regardless of game state
+    updateAmbience(game, dt);
 
     if (game.state === 'playing') {
       while (accumulator >= FIXED_DT) {

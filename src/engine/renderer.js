@@ -667,6 +667,76 @@ export function drawSplashes(ctx, splashes) {
   ctx.globalAlpha = 1;
 }
 
+// -------------------- NEW: whitecaps on the sea --------------------
+export function drawWhitecaps(ctx, whitecaps) {
+  for (const w of whitecaps) {
+    // Fade in for first 30% of life, fade out for last 30%
+    const t = w.life / w.maxLife;
+    const alpha = Math.min(t / 0.3, (1 - t) / 0.3, 1) * 0.7;
+    if (alpha <= 0) continue;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(w.x, w.y, w.w / 2, w.h / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// -------------------- NEW: parallax drifting clouds in sky --------------------
+export function drawClouds(ctx, clouds) {
+  for (const c of clouds) {
+    ctx.save();
+    ctx.globalAlpha = c.alpha;
+    ctx.fillStyle = '#f0f4ff';
+    for (const p of c.puffs) {
+      ctx.beginPath();
+      ctx.arc(c.x + p.dx, c.y + p.dy, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// -------------------- NEW: tidal wave wash on the shoreline --------------------
+export function drawTidal(ctx, tidalPhase) {
+  const washExtent = 12;
+  const phase = tidalPhase;
+
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = '#c8eeff';
+
+  // Animated wash body
+  ctx.beginPath();
+  ctx.moveTo(0, SEA_Y);
+  for (let px = 0; px <= CANVAS_W; px += 4) {
+    const wave = Math.sin(px * 0.015 + phase) * 4
+               + Math.sin(px * 0.03 - phase * 1.3) * 2;
+    const washY = SEA_Y - washExtent * Math.max(0, Math.sin(phase * 0.7)) + wave;
+    ctx.lineTo(px, washY);
+  }
+  ctx.lineTo(CANVAS_W, SEA_Y + 8);
+  ctx.lineTo(0, SEA_Y + 8);
+  ctx.closePath();
+  ctx.fill();
+
+  // Foam line along the wave edge
+  ctx.globalAlpha = 0.5;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let px = 0; px <= CANVAS_W; px += 4) {
+    const wave = Math.sin(px * 0.015 + phase) * 4
+               + Math.sin(px * 0.03 - phase * 1.3) * 2;
+    const washY = SEA_Y - washExtent * Math.max(0, Math.sin(phase * 0.7)) + wave;
+    px === 0 ? ctx.moveTo(px, washY) : ctx.lineTo(px, washY);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 // -------------------- FIX 6: enemy muzzle flash draw --------------------
 // Called for helicopter / enemy fire. sx/sy are projected screen coords.
 export function drawEnemyMuzzleFlash(ctx, sx, sy, scale, alpha) {

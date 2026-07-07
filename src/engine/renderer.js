@@ -261,11 +261,16 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
       // center-anchored at (sx, sy)
       ctx.drawImage(img, sx - drawW / 2, sy - drawH / 2, drawW, drawH);
     } else if (domain === 'sea') {
-      // FIX 1: sea sprites hull-centre-anchored so ships straddle the
-      // horizon line at spawn (d=1) instead of appearing entirely in the sky.
-      // 55 % of hull height sits above sy (above-water superstructure),
-      // 45 % below (keel below the waterline).
-      ctx.drawImage(img, sx - drawW / 2, sy - drawH * 0.55, drawW, drawH);
+      // FIX 2: depth-varying anchor so ships sit IN the water at all stages.
+      // At spawn (d=1, sy=HORIZON_Y=260): anchor=-0.2 pushes the sprite top to
+      // sy - drawH*(-0.2) = 260+5.6 = 265.6px — right at the visual sky/sea
+      // boundary, so the hull sits entirely in the sea zone, not the sky.
+      // At shore (d≈0.1, sy≈404): anchor=0.55 gives the correct beaching look,
+      // hull straddling the waterline with bow grounding on the beach.
+      // Formula: lerp(-0.2, 0.55, 1-d01) → -0.2 when far, 0.55 when near.
+      const d01sea = clamp01(entity.d || 0);
+      const seaAnchor = lerp(-0.2, 0.55, 1 - d01sea);
+      ctx.drawImage(img, sx - drawW / 2, sy - drawH * seaAnchor, drawW, drawH);
     } else {
       // land: bottom-anchored — feet/tracks sit at sy
       ctx.drawImage(img, sx - drawW / 2, sy - drawH, drawW, drawH);

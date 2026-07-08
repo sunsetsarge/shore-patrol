@@ -1,6 +1,12 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-07 (Round 4 shipped @8f42eea)
+Updated: 2026-07-07 (Round 5 shipped @94c1f73 — head-on facings az290/270 w/ aim_vec fix,
+LCVP primitive-built in Blender after 2 Meshy refusals (build_lcvp.py, +beached ramp-down
+frame/beachedSprite hook), tank_lst delivery def (pure JSON disgorge), heli
+approach→bob→strafe behavior, sea foam wakes. FOLLOW-UPS: LST is a generic warship not true
+bow-doors LST (regen or primitive-build later); far LCVPs read plain (texture pass);
+balance still hot; grep-contract cleanup owed on parallel session's files.)
+Previous: Round 4 @8f42eea
 Status: ACTIVE
 Phase: FINISH_PLAN A+B DONE + Round 4 DONE (end screens, part-composited vehicles, facings,
 fire states, rack-occlusion fix). NOTE: a parallel session added bosses/10 stages/upgrades/

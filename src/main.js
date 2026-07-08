@@ -94,6 +94,8 @@ function collectSpritePaths(data) {
   for (const e of data.enemies.enemies) {
     addSpritePaths(paths, e.sprite);
     addSpritePaths(paths, e.deathSprite);
+    addSpritePaths(paths, e.partSprite);
+    addSpritePaths(paths, e.fireSprite);
   }
   for (const c of data.crates.crates) {
     addSpritePaths(paths, c.sprite);
@@ -112,8 +114,13 @@ function createGame(canvas, ctx, data, audio) {
     audio,
     input: createInputState(),
     defense: 100,
-    state: 'menu', // menu | playing | paused | gameover
+    state: 'menu', // menu | playing | paused | gameover | victory
     time: 0,
+    // End-screen decompress/animation ages, ticked while in that state
+    gameoverAge: 0,
+    victoryAge: 0,
+    victoryPending: false,
+    isNewBest: false,
     // Ambient visual state — always active, survive game resets
     whitecaps: [],
     whitecapTimer: 0,
@@ -203,6 +210,10 @@ function initSystems(game, data) {
   UpgradeSystem.init(game);  // weapon tiers + upgrade panel state
   game.defense = 100;
   game.nukeDetonated = false;
+  game.gameoverAge = 0;
+  game.victoryAge = 0;
+  game.victoryPending = false;
+  game.isNewBest = false;
   game.state = 'playing';
 }
 
@@ -247,11 +258,26 @@ function update(game, dt) {
   Bosses.update(game, dt);   // boss logic runs after wave director
   ScoreSystem.update(game, dt);
 
+  // Victory: waveDirector cleared the final stage and declined to loop.
+  if (game.victoryPending && game.state === 'playing') {
+    game.victoryPending = false;
+    game.state = 'victory';
+    game.victoryAge = 0;
+    const prevBest = ScoreSystem.loadBest();
+    game.bestScore = ScoreSystem.saveBestIfHigher(game.score);
+    game.isNewBest = game.score > prevBest;
+    game.audio.play('victory');
+    return;
+  }
+
   // Nuke detonation: immediate game over with special flag already set
   if (game.nukeDetonated && game.state === 'playing') {
     game.defense = 0;
     game.state = 'gameover';
+    game.gameoverAge = 0;
+    const prevBest = ScoreSystem.loadBest();
     game.bestScore = ScoreSystem.saveBestIfHigher(game.score);
+    game.isNewBest = game.score > prevBest;
     game.audio.play('gameover');
     return;
   }
@@ -259,7 +285,10 @@ function update(game, dt) {
   if (game.defense <= 0) {
     game.defense = 0;
     game.state = 'gameover';
+    game.gameoverAge = 0;
+    const prevBest = ScoreSystem.loadBest();
     game.bestScore = ScoreSystem.saveBestIfHigher(game.score);
+    game.isNewBest = game.score > prevBest;
     game.audio.play('gameover');
   }
 }
@@ -280,6 +309,16 @@ function renderPlaying(ctx, game) {
     return db - da;
   });
 
+  // BUG FIX (Round 4 §5, tank hitbox-disappears report): the weapon rack
+  // HUD (Renderer.drawTurret, below) is a screen-fixed prop that used to be
+  // painted after every entity regardless of depth, so a land/sea entity
+  // close enough to the bunker that its sprite bottom reaches into the
+  // rack's screen band got visually erased by the rack even though its
+  // hit-rect (weaponSystem.js) was always intact and clickable. Entities
+  // whose projected bottom edge is at/below Renderer.CONSTANTS.RACK_NEAR_Y
+  // are held back here and redrawn AFTER the rack (near occludes far),
+  // matching the depth rule the rest of the scene already follows.
+  const nearRedraws = [];
   for (const e of drawList) {
     if (e.kind === 'crate') {
       const { sx, sy, scale } = Renderer.project(e.x, 0, e.alt, 'air');
@@ -288,6 +327,9 @@ function renderPlaying(ctx, game) {
       const domain = e.type.domain;
       const { sx, sy, scale } = Renderer.project(e.x, e.d, e.alt, domain);
       Renderer.drawEntityGlyph(ctx, e, sx, sy, scale);
+      if (domain !== 'air' && sy >= Renderer.CONSTANTS.RACK_NEAR_Y) {
+        nearRedraws.push({ e, sx, sy, scale });
+      }
     }
   }
 
@@ -336,6 +378,12 @@ function renderPlaying(ctx, game) {
   }
 
   Renderer.drawTurret(ctx, game.turret);
+
+  // Redraw close-range entities held back above so they occlude the rack
+  // instead of the rack occluding them (see nearRedraws comment above).
+  for (const { e, sx, sy, scale } of nearRedraws) {
+    Renderer.drawEntityGlyph(ctx, e, sx, sy, scale);
+  }
 
   const weapon = Turret.activeWeapon(game.turret);
   Renderer.drawReticle(ctx, game.turret.aimX, game.turret.aimY, weapon.reticle, weapon.color);
@@ -408,6 +456,58 @@ function renderPaused(ctx, game) {
   ctx.restore();
 }
 
+// Shared canvas-drawn YES/NO retry buttons — coordinates used both for
+// hover/hit-testing in input handling and for rendering.
+function getEndScreenButtons() {
+  return {
+    yes: { x: 640 - 170, y: 590, w: 140, h: 56, label: 'YES' },
+    no: { x: 640 + 30, y: 590, w: 140, h: 56, label: 'NO' },
+  };
+}
+
+function pointInButton(x, y, btn) {
+  return x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h;
+}
+
+function drawButton(ctx, btn, hovered) {
+  ctx.save();
+  const { x, y, w, h } = btn;
+  const r = 10;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+  ctx.fillStyle = hovered ? 'rgba(255,210,74,0.92)' : 'rgba(255,255,255,0.15)';
+  ctx.strokeStyle = hovered ? '#ffd24a' : '#fff';
+  ctx.lineWidth = 3;
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = hovered ? '#1a1a1a' : '#fff';
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(btn.label, x + w / 2, y + h / 2 + 2);
+  ctx.restore();
+}
+
+// "Play again?" + YES/NO buttons, shared by both end screens.
+function drawRetryPrompt(ctx, game) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 22px monospace';
+  shadowText(ctx, 'Play again?', 640, 560);
+  ctx.restore();
+
+  const btns = getEndScreenButtons();
+  const mx = game.input.mouseX, my = game.input.mouseY;
+  drawButton(ctx, btns.yes, pointInButton(mx, my, btns.yes));
+  drawButton(ctx, btns.no, pointInButton(mx, my, btns.no));
+}
+
 function renderGameover(ctx, game) {
   renderPlaying(ctx, game);
   ctx.save();
@@ -415,11 +515,33 @@ function renderGameover(ctx, game) {
   ctx.fillRect(0, 0, 1280, 720);
   ctx.textAlign = 'center';
 
-  // Special nuke game-over screen
+  // 1s non-interactive decompress: title fades/grows in before the score
+  // panel and retry prompt appear — kills the abruptness of a sudden loss.
+  const age = game.gameoverAge || 0;
+  const introT = Math.min(1, age / 1.0);
+  const decompressed = introT >= 1;
+
+  ctx.save();
+  ctx.globalAlpha = introT;
+  const titleCx = 640, titleCy = game.nukeDetonated ? 230 : 260;
+  ctx.translate(titleCx, titleCy);
+  const s = 0.6 + 0.4 * introT;
+  ctx.scale(s, s);
+  ctx.translate(-titleCx, -titleCy);
   if (game.nukeDetonated) {
     ctx.fillStyle = '#ff6600';
     ctx.font = 'bold 58px monospace';
-    shadowText(ctx, '☢ NUCLEAR STRIKE ☢', 640, 230);
+    shadowText(ctx, '☢ NUCLEAR STRIKE ☢', titleCx, titleCy);
+  } else {
+    ctx.fillStyle = '#ff5050';
+    ctx.font = 'bold 64px monospace';
+    shadowText(ctx, 'BASE OVERRUN', titleCx, titleCy);
+  }
+  ctx.restore();
+
+  if (game.nukeDetonated) {
+    ctx.save();
+    ctx.globalAlpha = introT;
     ctx.fillStyle = '#ffcc00';
     ctx.font = 'bold 24px monospace';
     shadowText(ctx, 'THE BOMBER REACHED THE COASTLINE', 640, 286);
@@ -427,21 +549,83 @@ function renderGameover(ctx, game) {
     ctx.font = '20px monospace';
     shadowText(ctx, 'The nuclear payload was released.', 640, 316);
     shadowText(ctx, 'The beach, and everything beyond it, is gone.', 640, 340);
-  } else {
-    ctx.fillStyle = '#ff5050';
-    ctx.font = 'bold 64px monospace';
-    shadowText(ctx, 'BASE OVERRUN', 640, 260);
+    ctx.restore();
   }
 
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 32px monospace';
-  shadowText(ctx, `Score: ${game.score}`, 640, game.nukeDetonated ? 380 : 322);
+  if (decompressed) {
+    const info = WaveDirector.currentWaveInfo(game);
+    const stageLabel = info.isLooping
+      ? `Endless Wave ${info.loopCount}`
+      : `Stage ${info.id}/${info.total}`;
+    const baseY = game.nukeDetonated ? 380 : 400;
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 32px monospace';
+    shadowText(ctx, `Score: ${game.score}`, 640, baseY);
+    ctx.fillStyle = '#ffd24a';
+    ctx.font = '22px monospace';
+    shadowText(ctx, `Best: ${game.bestScore}`, 640, baseY + 36);
+    let nextY = baseY + 64;
+    if (game.isNewBest) {
+      ctx.fillStyle = '#7dffb0';
+      ctx.font = 'bold 20px monospace';
+      shadowText(ctx, 'NEW BEST!', 640, nextY);
+      nextY += 28;
+    }
+    ctx.fillStyle = '#ccc';
+    ctx.font = '16px monospace';
+    shadowText(ctx, stageLabel, 640, nextY);
+
+    drawRetryPrompt(ctx, game);
+  }
+
+  ctx.restore();
+}
+
+function renderVictory(ctx, game) {
+  renderPlaying(ctx, game);
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, 1280, 720);
+  ctx.textAlign = 'center';
+
+  const age = game.victoryAge || 0;
+  const introT = Math.min(1, age / 0.6);
+
+  ctx.save();
+  ctx.globalAlpha = introT;
+  const cx = 640, cy = 220;
+  ctx.translate(cx, cy);
+  const s = 0.6 + 0.4 * introT;
+  ctx.scale(s, s);
+  ctx.translate(-cx, -cy);
   ctx.fillStyle = '#ffd24a';
-  ctx.font = '22px monospace';
-  shadowText(ctx, `Best: ${game.bestScore}`, 640, game.nukeDetonated ? 410 : 358);
-  ctx.fillStyle = '#ccc';
+  ctx.font = 'bold 72px monospace';
+  shadowText(ctx, 'BEACH SECURED', cx, cy);
+  ctx.restore();
+
+  const info = WaveDirector.currentWaveInfo(game);
+  const stageLabel = `Stages cleared: ${info.id}/${info.total}`;
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 36px monospace';
+  shadowText(ctx, `Score: ${game.score}`, 640, 320);
+  ctx.fillStyle = '#ffd24a';
+  ctx.font = '24px monospace';
+  shadowText(ctx, `Best: ${game.bestScore}`, 640, 358);
+  let nextY = 392;
+  if (game.isNewBest) {
+    ctx.fillStyle = '#7dffb0';
+    ctx.font = 'bold 22px monospace';
+    shadowText(ctx, 'NEW BEST!', 640, nextY);
+    nextY += 28;
+  }
+  ctx.fillStyle = '#cfe';
   ctx.font = '18px monospace';
-  shadowText(ctx, 'Click or press ENTER to restart', 640, game.nukeDetonated ? 450 : 414);
+  shadowText(ctx, stageLabel, 640, nextY);
+
+  drawRetryPrompt(ctx, game);
+
   ctx.restore();
 }
 
@@ -456,6 +640,8 @@ function render(game) {
     renderPaused(ctx, game);
   } else if (game.state === 'gameover') {
     renderGameover(ctx, game);
+  } else if (game.state === 'victory') {
+    renderVictory(ctx, game);
   }
 }
 
@@ -543,13 +729,36 @@ async function main() {
 
   attachInput(canvas, game.input, () => audio.ensureStarted());
 
-  function handleMenuOrGameoverInput() {
+  // Handles input for menu, gameover, and victory states. Menu keeps its
+  // original "any click/confirm starts a run" behavior. Gameover/victory
+  // show a YES/NO retry prompt: keyboard (Y/Enter=yes, N/Esc=no) or a
+  // canvas-coordinate click hit-test against the prompt's button zones.
+  // Gameover additionally ignores all of this during its 1s decompress.
+  function handleEndScreenInput() {
     const events = drainQueue(game.input);
+    const state = game.state;
     for (const evt of events) {
-      if (evt.type === 'click' || evt.type === 'confirm' || evt.type === 'fireStart') {
-        if (game.state === 'menu' || game.state === 'gameover') {
+      if (state === 'menu') {
+        if (evt.type === 'click' || evt.type === 'confirm' || evt.type === 'fireStart') {
           resetGame(game, data);
         }
+        continue;
+      }
+      if (state !== 'gameover' && state !== 'victory') continue;
+
+      const decompressing = state === 'gameover' && (game.gameoverAge || 0) < 1.0;
+      if (decompressing) continue; // ignore all inputs during the intro
+
+      if (evt.type === 'confirm' || evt.type === 'confirmYes') {
+        resetGame(game, data);
+      } else if (evt.type === 'confirmNo') {
+        game.state = 'menu';
+      } else if (evt.type === 'click') {
+        const btns = getEndScreenButtons();
+        const x = evt.x != null ? evt.x : game.input.mouseX;
+        const y = evt.y != null ? evt.y : game.input.mouseY;
+        if (pointInButton(x, y, btns.yes)) resetGame(game, data);
+        else if (pointInButton(x, y, btns.no)) game.state = 'menu';
       }
     }
   }
@@ -573,7 +782,14 @@ async function main() {
     for (let i = 0; i < steps; i++) {
       if (game.state === 'playing') update(game, FIXED_DT);
       else if (game.state === 'paused') handlePausedInput();
-      else handleMenuOrGameoverInput();
+      else {
+        // Covers menu, gameover, AND victory generically — victory needs no
+        // special case, it just falls through like any other non-playing,
+        // non-paused state.
+        if (game.state === 'gameover') game.gameoverAge = (game.gameoverAge || 0) + FIXED_DT;
+        if (game.state === 'victory') game.victoryAge = (game.victoryAge || 0) + FIXED_DT;
+        handleEndScreenInput();
+      }
     }
     render(game);
     return game.state;
@@ -603,8 +819,10 @@ async function main() {
       // burst-run catch-up ticks
       accumulator = 0;
     } else {
-      handleMenuOrGameoverInput();
-      // still tick turret aim for reticle visuals on menu/gameover
+      if (game.state === 'gameover') game.gameoverAge = (game.gameoverAge || 0) + dt;
+      if (game.state === 'victory') game.victoryAge = (game.victoryAge || 0) + dt;
+      handleEndScreenInput();
+      // still tick turret aim for reticle visuals on menu/gameover/victory
       Turret.updateAim(game.turret || Turret.createTurret(data.weapons.weapons), game.input.mouseX, game.input.mouseY);
       if (!game.turret) {
         // lazily create a turret just for menu reticle rendering

@@ -7,6 +7,10 @@ import { project } from '../engine/renderer.js';
 
 let enemyDefsById = {};
 
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
 export function init(game, data) {
   enemyDefsById = {};
   for (const e of data.enemies.enemies) {
@@ -180,6 +184,12 @@ export function update(game, dt) {
     notifyEnemyFire(entity) {
       game.effects.push({ kind: 'enemy_muzzle', x: entity.x, d: entity.d, alt: entity.alt, domain: entity.type.domain, life: 0.12, age: 0 });
     },
+    // Round 4 §4: shell/bullet tracer from a firing entity toward the bunker
+    // (screen bottom-center), reusing the existing tracer effect kind.
+    spawnTracer(entity) {
+      const { sx, sy } = project(entity.x, entity.d, entity.alt, entity.type.domain);
+      game.effects.push({ kind: 'tracer', x1: sx, y1: sy, x2: 640, y2: 700, color: entity.type.color || '#ffcc66', life: 0.15, age: 0 });
+    },
     spawnChildren(entity, spawnsOnDeath) {
       spawnChildren(game, entity, spawnsOnDeath, api.difficulty);
     },
@@ -203,10 +213,16 @@ export function update(game, dt) {
       continue;
     }
     e.age += dt;
+    const prevX = e.x;
     const behavior = movementBehaviors[e.type.movement];
     if (behavior) {
       behavior(e, dt, api);
     }
+    // Round 4 §2/§3: smoothed horizontal heading (world x-units/sec), tracked
+    // generically for every entity so mirrorByHeading/bankFactor renderer
+    // fields work on any def without movement-behavior-specific plumbing.
+    const vx = dt > 0 ? (e.x - prevX) / dt : 0;
+    e.headX = lerp(e.headX === undefined ? 0 : e.headX, vx, 0.1);
   }
 
   // handle kill scoring/effects (player kills only), fired exactly once at

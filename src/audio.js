@@ -118,6 +118,10 @@ const sounds = {
   gameover() {
     playTone(400, 80, 1.0, 'sawtooth', 0.35);
   },
+  victory() {
+    playTone(440, 880, 0.25, 'triangle', 0.3);
+    playTone(660, 1320, 0.3, 'triangle', 0.25);
+  },
 };
 
 export function createAudio() {

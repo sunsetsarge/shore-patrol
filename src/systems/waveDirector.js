@@ -164,7 +164,15 @@ export function update(game, dt) {
     (waveDef.boss === 'bomber' || waveDef.boss === 'final' ? ws.bomberSpawned : true);
 
   if ((cleared || timeUp) && allBossesSpawned && !hasBossAlive) {
-    startWave(game, ws.index + 1);
+    const nextIndex = ws.index + 1;
+    if (nextIndex >= ws.waves.length) {
+      // Final stage cleared — end the run in victory instead of looping
+      // endlessly. main.js notices victoryPending and transitions state.
+      ws.active = false;
+      game.victoryPending = true;
+      return;
+    }
+    startWave(game, nextIndex);
   }
 }
 
@@ -178,7 +186,13 @@ function doSpawn(game, spawnDef, difficulty) {
 export function debugForceNextWave(game) {
   const ws = game.waveState;
   if (!ws) return;
-  startWave(game, ws.index + 1);
+  const nextIndex = ws.index + 1;
+  if (nextIndex >= ws.waves.length) {
+    ws.active = false;
+    game.victoryPending = true;
+    return;
+  }
+  startWave(game, nextIndex);
 }
 
 export function currentWaveInfo(game) {

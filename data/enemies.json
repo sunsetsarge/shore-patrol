@@ -6,12 +6,12 @@
       "domain": "land",
       "hp": 8,
       "speed": 0.045,
-      "movement": "straight_approach",
+      "movement": "advance_and_fire",
       "hitbox": 26,
       "scoreValue": 100,
       "damageToBase": 4,
-      "fireDamage": 0,
-      "fireInterval": 0,
+      "fireDamage": 2,
+      "fireInterval": 5,
       "spawnsOnDeath": null,
       "color": "#7a8b3a",
       "shape": "biped",
@@ -36,7 +36,15 @@
         "assets/frames/infantry_death_4.png",
         "assets/frames/infantry_death_5.png"
       ],
-      "deathFps": 10
+      "deathFps": 10,
+      "mirrorByHeading": true,
+      "fireSprite": [
+        "assets/frames/infantry_fire_0.png",
+        "assets/frames/infantry_fire_1.png",
+        "assets/frames/infantry_fire_2.png"
+      ],
+      "fireFps": 8,
+      "standoffD": 0.12
     },
     {
       "id": "tank",
@@ -44,12 +52,12 @@
       "domain": "land",
       "hp": 120,
       "speed": 0.02,
-      "movement": "straight_approach",
+      "movement": "advance_and_fire",
       "hitbox": 40,
       "scoreValue": 300,
       "damageToBase": 15,
-      "fireDamage": 0,
-      "fireInterval": 0,
+      "fireDamage": 8,
+      "fireInterval": 6,
       "spawnsOnDeath": null,
       "color": "#5c6b2e",
       "shape": "tank",
@@ -61,7 +69,21 @@
         "assets/frames/tank_3.png"
       ],
       "spriteScale": 1.3,
-      "spriteFps": 6
+      "spriteFps": 6,
+      "partSprite": [
+        "assets/frames/tank_turret_0.png",
+        "assets/frames/tank_turret_1.png",
+        "assets/frames/tank_turret_2.png",
+        "assets/frames/tank_turret_3.png",
+        "assets/frames/tank_turret_4.png"
+      ],
+      "partMode": "aim",
+      "partAimRange": [
+        -24,
+        24
+      ],
+      "mirrorByHeading": true,
+      "standoffD": 0.3
     },
     {
       "id": "landing_craft",
@@ -90,7 +112,10 @@
         "assets/frames/landing_craft_3.png"
       ],
       "spriteScale": 1.4,
-      "spriteFps": 6
+      "spriteFps": 6,
+      "bobAmp": 3,
+      "bobHz": 0.5,
+      "mirrorByHeading": true
     },
     {
       "id": "helicopter",
@@ -115,7 +140,15 @@
         "assets/frames/helicopter_3.png"
       ],
       "spriteScale": 1.5,
-      "spriteFps": 6
+      "spriteFps": 6,
+      "partSprite": [
+        "assets/frames/helicopter_rotor_0.png",
+        "assets/frames/helicopter_rotor_1.png",
+        "assets/frames/helicopter_rotor_2.png"
+      ],
+      "partMode": "spin",
+      "partFps": 24,
+      "bankFactor": 2.5
     },
     {
       "id": "commando",
@@ -153,7 +186,14 @@
         "assets/frames/commando_death_4.png",
         "assets/frames/commando_death_5.png"
       ],
-      "deathFps": 10
+      "deathFps": 10,
+      "mirrorByHeading": true,
+      "fireSprite": [
+        "assets/frames/commando_fire_0.png",
+        "assets/frames/commando_fire_1.png",
+        "assets/frames/commando_fire_2.png"
+      ],
+      "fireFps": 8
     },
     {
       "id": "commando_craft",
@@ -182,7 +222,10 @@
         "assets/frames/landing_craft_3.png"
       ],
       "spriteScale": 1.4,
-      "spriteFps": 6
+      "spriteFps": 6,
+      "bobAmp": 3,
+      "bobHz": 0.5,
+      "mirrorByHeading": true
     }
   ]
 }

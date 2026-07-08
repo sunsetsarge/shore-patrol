@@ -144,19 +144,26 @@ for unit in cfg["units"]:
         bsdf.inputs["Roughness"].default_value = 0.55
         rifle.data.materials.append(mat)
 
+    RIFLE_MODE = unit.get("rifle_mode", "facing")  # "facing" | "hand"
     def place_rifle():
         if not (rifle and arm_obj): return
+        from mathutils import Matrix as _M
         dgx = bpy.context.evaluated_depsgraph_get()
         armE = arm_obj.evaluated_get(dgx)
-        rh = (arm_obj.matrix_world @ armE.pose.bones['RightHand'].matrix).translation
-        # rifle aims along the character's facing (-Y for these rigs) with a
-        # slight upward tilt, anchored at the trigger (right) hand; the grip
-        # line between hands is diagonal and NOT the aim axis.
-        aimn = Vector((0.0, -1.0, 0.03)).normalized()
-        mid = rh + aimn * (L * 0.30)
-        quat = aimn.to_track_quat('Y', 'Z')
-        from mathutils import Matrix as _M
-        rifle.matrix_world = _M.Translation(mid) @ quat.to_matrix().to_4x4()
+        handM = arm_obj.matrix_world @ armE.pose.bones['RightHand'].matrix
+        rh = handM.translation
+        if RIFLE_MODE == "hand":
+            # ride the hand bone's full orientation: rifle's +Y follows the
+            # bone's -Z (empirically the "fingers-forward" axis on this rig),
+            # so torso rotation mid-anim carries the weapon correctly.
+            boneR = handM.to_quaternion().to_matrix().to_4x4()
+            local = _M.Rotation(math.radians(unit.get("rifle_pitch_deg", 90)), 4, 'X')
+            rifle.matrix_world = _M.Translation(rh) @ boneR @ local @ _M.Translation(Vector((0, L*0.30, 0)))
+        else:
+            aimn = Vector((0.0, -1.0, 0.03)).normalized()
+            mid = rh + aimn * (L * 0.30)
+            quat = aimn.to_track_quat('Y', 'Z')
+            rifle.matrix_world = _M.Translation(mid) @ quat.to_matrix().to_4x4()
 
     roots = [o for o in sc.objects if o.parent is None and o.type in ('MESH','ARMATURE','EMPTY')]
     base_mw = [(o, o.matrix_world.copy()) for o in roots]

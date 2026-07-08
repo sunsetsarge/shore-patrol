@@ -226,6 +226,51 @@ const glyphRegistry = {
   },
 };
 
+// Round 4 §3: draws a part overlay (rotor/turret/etc.) at the SAME centered
+// destination rect as the base sprite it's layered on. Dispatches purely on
+// def field presence:
+//   partMode 'spin' — continuous rotor-style spin, frame = floor(time*fps)%n
+//   partMode 'aim'  — frame chosen by the entity's angle toward the bunker
+//                     (screen bottom-center 640,700), clamped to partAimRange
+//                     (default [-24,24] degrees) and mapped to the nearest frame.
+// `bank`/`mirror` are re-applied identically to the base sprite's transform
+// so the part stays pixel-locked to it through banking/mirroring.
+// While entity.firing (Round 4 §4), the part kicks back a few px for a
+// recoil-on-fire flourish — generic, dispatched on entity.firing + partSprite
+// presence, not on any content id.
+function drawPartOverlay(ctx, entity, type, sx, sy, drawW, drawH, centerY, bank, mirror) {
+  const frames = type.partSprite;
+  const mode = type.partMode || 'spin';
+  let idx = 0;
+  if (mode === 'aim') {
+    const [minA, maxA] = type.partAimRange || [-24, 24];
+    const dx = 640 - sx;
+    const dy = 700 - sy;
+    let angleDeg = Math.atan2(dx, dy) * 180 / Math.PI;
+    angleDeg = Math.max(minA, Math.min(maxA, angleDeg));
+    idx = frames.length > 1 ? Math.round((angleDeg - minA) / (maxA - minA) * (frames.length - 1)) : 0;
+  } else {
+    const fps = type.partFps || 10;
+    idx = Math.floor((entity.age || 0) * fps) % frames.length;
+  }
+  const path = frames[idx];
+  const img = path ? Sprites.get(path) : null;
+  if (!img) return;
+
+  let recoilY = 0;
+  if (entity.firing) {
+    const rt = Math.max(0, 1 - (entity.fireAge || 0) / 0.12);
+    recoilY = 3 * rt;
+  }
+
+  ctx.save();
+  ctx.translate(sx, centerY + recoilY);
+  if (bank) ctx.rotate(bank);
+  if (mirror) ctx.scale(-1, 1);
+  ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+  ctx.restore();
+}
+
 export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
   const type = entity.type || {};
   const shape = type.shape;
@@ -250,16 +295,32 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
     // nothing pops out of existence while the image loads.
   }
 
-  const spritePath = resolveSpritePath(type.sprite, type.spriteFps, entity.age);
+  // Round 4 §3: sea-domain gentle sine bob, visual only — never touches the
+  // hit-test (weaponSystem.js projects its own sx/sy independently of this
+  // renderer call, so this offset can't desync hitboxes from what's drawn).
+  let drawSy = sy;
+  if (type.bobAmp) {
+    const hz = type.bobHz || 0.2;
+    drawSy = sy + Math.sin((entity.age || 0) * 2 * Math.PI * hz + (entity.uid || 0)) * type.bobAmp;
+  }
+
+  // Round 4 §4: a unit with fireSprite fires a brief one-shot animation
+  // (entity.firing/fireAge set by movementBehaviors' advance_and_fire /
+  // hover_and_dive) instead of its normal looping walk/idle sprite.
+  const spritePath = (entity.firing && type.fireSprite)
+    ? resolveOneShotFramePath(type.fireSprite, type.fireFps, entity.fireAge)
+    : resolveSpritePath(type.sprite, type.spriteFps, entity.age);
   const img = spritePath ? Sprites.get(spritePath) : null;
   if (img) {
     const spriteScale = type.spriteScale || 1.0;
     const domain = type.domain;
     const drawH = (type.hitbox || 26) * 2.4 * scale * spriteScale;
     const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+
+    let top;
     if (domain === 'air') {
       // center-anchored at (sx, sy)
-      ctx.drawImage(img, sx - drawW / 2, sy - drawH / 2, drawW, drawH);
+      top = drawSy - drawH / 2;
     } else if (domain === 'sea') {
       // FIX 2: depth-varying anchor so ships sit IN the water at all stages.
       // At spawn (d=1, sy=HORIZON_Y=260): anchor=-0.2 pushes the sprite top to
@@ -270,10 +331,47 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
       // Formula: lerp(-0.2, 0.55, 1-d01) → -0.2 when far, 0.55 when near.
       const d01sea = clamp01(entity.d || 0);
       const seaAnchor = lerp(-0.2, 0.55, 1 - d01sea);
-      ctx.drawImage(img, sx - drawW / 2, sy - drawH * seaAnchor, drawW, drawH);
+      top = drawSy - drawH * seaAnchor;
     } else {
       // land: bottom-anchored — feet/tracks sit at sy
-      ctx.drawImage(img, sx - drawW / 2, sy - drawH, drawW, drawH);
+      top = drawSy - drawH;
+    }
+    const centerY = top + drawH / 2;
+
+    // Round 4 §2: mirror horizontally when moving screen-right, with
+    // hysteresis on entity.headX (world x-units/sec, tracked generically in
+    // spawnSystem.js) so the facing doesn't flicker right at zero drift.
+    let mirror = false;
+    if (type.mirrorByHeading) {
+      const hx = entity.headX || 0;
+      const band = 0.01;
+      if (entity.mirrorState === undefined) entity.mirrorState = false;
+      if (hx > band) entity.mirrorState = true;
+      else if (hx < -band) entity.mirrorState = false;
+      mirror = entity.mirrorState;
+    }
+
+    // Round 4 §3: code-driven body roll ("bank") proportional to smoothed
+    // horizontal heading, clamped to +-~10deg.
+    let bank = 0;
+    if (type.bankFactor) {
+      const hx = entity.headX || 0;
+      const maxBank = 0.17;
+      bank = Math.max(-maxBank, Math.min(maxBank, hx * type.bankFactor));
+    }
+
+    ctx.save();
+    ctx.translate(sx, centerY);
+    if (bank) ctx.rotate(bank);
+    if (mirror) ctx.scale(-1, 1);
+    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.restore();
+
+    // Round 4 §3: part-composited overlay (rotor spin / turret aim), drawn
+    // at the EXACT same destination rect as the base sprite — the base/part
+    // asset pairs share one bbox so they're pixel-aligned as pure overlays.
+    if (type.partSprite && type.partSprite.length) {
+      drawPartOverlay(ctx, entity, type, sx, sy, drawW, drawH, centerY, bank, mirror);
     }
   } else {
     const fn = glyphRegistry[shape];
@@ -411,6 +509,20 @@ const RACK_BASELINE_Y = 712;
 const RACK_DRAW_H = 72;
 const RACK_RISE_PX = 18; // active sprite rises this many px over riseT 0->1
 const RACK_RECOIL_PX = 6; // active sprite recoils down/back this many px at recoilTimer=1
+
+// BUG FIX (Round 4 §5): the weapon rack HUD (drawTurret) used to be painted
+// unconditionally on top of every entity, including land/sea entities close
+// enough to the bunker that their sprite footprint overlaps the rack's
+// screen band (~x 700..1100, y ~600..712). Their hit-rect (weaponSystem.js
+// pointHitsSprite, same geometry as here) was ALWAYS correct — this was a
+// pure z-order/visibility bug: at close range the rack visually erased the
+// lower body of the target, so players couldn't see what they were aiming
+// at and perceived the hitbox as "gone". RACK_NEAR_Y is the highest y the
+// risen active-weapon sprite can reach; callers (main.js renderPlaying)
+// redraw any entity whose projected bottom edge is below this line AFTER
+// the rack, restoring the "near occludes far" rule the rest of the scene
+// already follows.
+export const RACK_NEAR_Y = RACK_BASELINE_Y - RACK_RISE_PX - RACK_DRAW_H * 1.25;
 
 function drawVectorBarrel(ctx, turret) {
   const originX = 640;
@@ -767,4 +879,4 @@ export function drawEnemyMuzzleFlash(ctx, sx, sy, scale, alpha) {
   ctx.restore();
 }
 
-export const CONSTANTS = { CANVAS_W, CANVAS_H, HORIZON_Y, SEA_Y, BEACH_Y };
+export const CONSTANTS = { CANVAS_W, CANVAS_H, HORIZON_Y, SEA_Y, BEACH_Y, RACK_NEAR_Y };

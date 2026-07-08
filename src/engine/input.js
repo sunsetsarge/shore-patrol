@@ -67,15 +67,25 @@ export function attachInput(canvas, inputState, onFirstGesture) {
       inputState.queue.push({ type: 'cycleWeapon', dir: 1 });
     } else if (e.key === 'Enter' || e.key === ' ') {
       inputState.queue.push({ type: 'confirm' });
-    } else if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+    } else if (e.key === 'Escape') {
+      // Escape both pauses live play AND is the "No" answer on end-screen
+      // retry prompts (victory/gameover) — harmless no-op wherever unused.
+      inputState.queue.push({ type: 'pause' });
+      inputState.queue.push({ type: 'confirmNo' });
+    } else if (e.key === 'p' || e.key === 'P') {
       inputState.queue.push({ type: 'pause' });
     } else if (e.key === 'm' || e.key === 'M') {
       inputState.queue.push({ type: 'menu' });
+    } else if (e.key === 'y' || e.key === 'Y') {
+      inputState.queue.push({ type: 'confirmYes' });
+    } else if (e.key === 'n' || e.key === 'N') {
+      inputState.queue.push({ type: 'confirmNo' });
     }
   });
 
-  canvas.addEventListener('click', () => {
-    inputState.queue.push({ type: 'click' });
+  canvas.addEventListener('click', (e) => {
+    const { x, y } = toCanvasCoords(e.clientX, e.clientY);
+    inputState.queue.push({ type: 'click', x, y });
   });
 }
 

@@ -1,8 +1,12 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-07 (session-handoff wrap)
+Updated: 2026-07-07 (Round 4 shipped @8f42eea)
 Status: ACTIVE
-Phase: FINISH_PLAN.md — Phase A + B DONE; next is Phase C (juice), of 8 (A–H)
+Phase: FINISH_PLAN A+B DONE + Round 4 DONE (end screens, part-composited vehicles, facings,
+fire states, rack-occlusion fix). NOTE: a parallel session added bosses/10 stages/upgrades/
+debug panel (unreviewed by this lane; grep contract has pre-existing violations in bosses.js/
+upgradeSystem.js/debug API — cleanup owed). Next: Phase C (juice) — partially covered by the
+parallel session's particles; RE-ASSESS against FINISH_PLAN C checklist before redoing.
 
 ## NEXT ACTION
 Execute FINISH_PLAN.md Phase C (juice pass): add screenshake (game.shake scalar, world-draw

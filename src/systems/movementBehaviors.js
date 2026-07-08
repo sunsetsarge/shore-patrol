@@ -69,13 +69,32 @@ export const movementBehaviors = {
   },
 
   hover_and_dive(entity, dt, api) {
+    // Head-on approach from the horizon (growing with the projection), then a
+    // brief forward "arrival bob" overshoot, then lateral strafing + volleys.
     const speed = entity.type.speed * api.difficulty.speed;
     const hoverD = 0.3;
-    if (entity.d > hoverD) {
+    const BOB_TIME = 1.2; // seconds of arrival overshoot-and-settle
+
+    if (entity.flags.arrived === undefined) entity.flags.arrived = false;
+
+    if (!entity.flags.arrived) {
+      // Phase 1: straight head-on approach — hold x fixed so it comes right
+      // out of the horizon at the player, growing as it nears.
       entity.d -= speed * dt;
-      if (entity.d <= hoverD) entity.d = hoverD;
+      if (entity.d <= hoverD) {
+        entity.d = hoverD;
+        entity.flags.arrived = true;
+        entity.flags.bobT = 0;
+      }
+    } else if (entity.flags.bobT !== undefined && entity.flags.bobT < BOB_TIME) {
+      // Phase 2: arrival bob — nose dips forward past the hover line and
+      // settles back (damped half-sine on d).
+      entity.flags.bobT += dt;
+      const t = entity.flags.bobT / BOB_TIME;
+      entity.d = hoverD - Math.sin(Math.PI * t) * 0.05 * (1 - t * 0.4);
     } else {
-      // hover with x-drift
+      // Phase 3: strafe left/right while firing.
+      entity.d = hoverD;
       if (entity.flags.driftPhase === undefined) entity.flags.driftPhase = Math.random() * Math.PI * 2;
       entity.flags.driftPhase += dt * 0.8;
       if (entity.flags.baseX === undefined) entity.flags.baseX = entity.x;

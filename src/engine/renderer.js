@@ -307,9 +307,15 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
   // Round 4 §4: a unit with fireSprite fires a brief one-shot animation
   // (entity.firing/fireAge set by movementBehaviors' advance_and_fire /
   // hover_and_dive) instead of its normal looping walk/idle sprite.
-  const spritePath = (entity.firing && type.fireSprite)
-    ? resolveOneShotFramePath(type.fireSprite, type.fireFps, entity.fireAge)
-    : resolveSpritePath(type.sprite, type.spriteFps, entity.age);
+  let spritePath;
+  if (entity.firing && type.fireSprite) {
+    spritePath = resolveOneShotFramePath(type.fireSprite, type.fireFps, entity.fireAge);
+  } else if (type.beachedSprite && entity.flags && (entity.flags.rampDown || entity.flags.beached)) {
+    // Beached craft hold their ramp-down frame (generic def field).
+    spritePath = type.beachedSprite;
+  } else {
+    spritePath = resolveSpritePath(type.sprite, type.spriteFps, entity.age);
+  }
   const img = spritePath ? Sprites.get(spritePath) : null;
   if (img) {
     const spriteScale = type.spriteScale || 1.0;
@@ -332,6 +338,19 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
       const d01sea = clamp01(entity.d || 0);
       const seaAnchor = lerp(-0.2, 0.55, 1 - d01sea);
       top = drawSy - drawH * seaAnchor;
+      // Foam wake at the hull's waterline so approaching craft read as
+      // sitting IN the water rather than floating (bow-on hulls have no
+      // visible water contact without it). Skip once beached.
+      if (!(entity.flags && (entity.flags.beached || entity.flags.rampDown))) {
+        const wlY = top + drawH * lerp(0.82, 0.95, 1 - d01sea);
+        ctx.save();
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = '#e8f4f0';
+        ctx.beginPath();
+        ctx.ellipse(sx, wlY, drawW * 0.62, Math.max(2.5, drawH * 0.06), 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     } else {
       // land: bottom-anchored — feet/tracks sit at sy
       top = drawSy - drawH;

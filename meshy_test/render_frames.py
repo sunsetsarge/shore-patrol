@@ -160,7 +160,8 @@ for unit in cfg["units"]:
             local = _M.Rotation(math.radians(unit.get("rifle_pitch_deg", 90)), 4, 'X')
             rifle.matrix_world = _M.Translation(rh) @ boneR @ local @ _M.Translation(Vector((0, L*0.30, 0)))
         else:
-            aimn = Vector((0.0, -1.0, 0.03)).normalized()
+            av = unit.get('aim_vec', [0.0, -1.0, 0.03])
+            aimn = Vector(av).normalized()
             mid = rh + aimn * (L * 0.30)
             quat = aimn.to_track_quat('Y', 'Z')
             rifle.matrix_world = _M.Translation(mid) @ quat.to_matrix().to_4x4()

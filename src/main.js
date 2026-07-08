@@ -96,6 +96,7 @@ function collectSpritePaths(data) {
     addSpritePaths(paths, e.deathSprite);
     addSpritePaths(paths, e.partSprite);
     addSpritePaths(paths, e.fireSprite);
+    addSpritePaths(paths, e.beachedSprite);
   }
   for (const c of data.crates.crates) {
     addSpritePaths(paths, c.sprite);

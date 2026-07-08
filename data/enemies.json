@@ -106,16 +106,17 @@
       "shape": "boat",
       "behaviorScript": null,
       "sprite": [
-        "assets/frames/landing_craft_0.png",
-        "assets/frames/landing_craft_1.png",
-        "assets/frames/landing_craft_2.png",
-        "assets/frames/landing_craft_3.png"
+        "assets/frames/lcvp_0.png",
+        "assets/frames/lcvp_1.png",
+        "assets/frames/lcvp_2.png",
+        "assets/frames/lcvp_3.png"
       ],
-      "spriteScale": 1.4,
+      "spriteScale": 1.5,
       "spriteFps": 6,
       "bobAmp": 3,
       "bobHz": 0.5,
-      "mirrorByHeading": true
+      "mirrorByHeading": true,
+      "beachedSprite": "assets/frames/lcvp_beached.png"
     },
     {
       "id": "helicopter",
@@ -216,16 +217,50 @@
       "shape": "boat",
       "behaviorScript": null,
       "sprite": [
-        "assets/frames/landing_craft_0.png",
-        "assets/frames/landing_craft_1.png",
-        "assets/frames/landing_craft_2.png",
-        "assets/frames/landing_craft_3.png"
+        "assets/frames/lcvp_0.png",
+        "assets/frames/lcvp_1.png",
+        "assets/frames/lcvp_2.png",
+        "assets/frames/lcvp_3.png"
       ],
-      "spriteScale": 1.4,
+      "spriteScale": 1.5,
       "spriteFps": 6,
       "bobAmp": 3,
       "bobHz": 0.5,
-      "mirrorByHeading": true
+      "mirrorByHeading": true,
+      "beachedSprite": "assets/frames/lcvp_beached.png"
+    },
+    {
+      "id": "tank_lst",
+      "name": "Tank Landing Ship",
+      "domain": "sea",
+      "hp": 160,
+      "speed": 0.022,
+      "movement": "land_then_disgorge",
+      "hitbox": 60,
+      "scoreValue": 500,
+      "damageToBase": 0,
+      "fireDamage": 0,
+      "fireInterval": 0,
+      "spawnsOnDeath": {
+        "enemyId": "tank",
+        "count": 1,
+        "spread": 0.04
+      },
+      "color": "#3a4a5c",
+      "shape": "boat",
+      "behaviorScript": null,
+      "sprite": [
+        "assets/frames/lst_0.png",
+        "assets/frames/lst_1.png",
+        "assets/frames/lst_2.png",
+        "assets/frames/lst_3.png"
+      ],
+      "spriteScale": 1.6,
+      "spriteFps": 6,
+      "bobAmp": 2,
+      "bobHz": 0.4,
+      "mirrorByHeading": true,
+      "beachedSprite": null
     }
   ]
 }

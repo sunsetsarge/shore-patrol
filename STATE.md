@@ -1,6 +1,13 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-07 (Round 5 shipped @94c1f73 — head-on facings az290/270 w/ aim_vec fix,
+Updated: 2026-07-09 (Round 6 shipped @02d3712 — 3D BATTLESHIP BOSS: Meshy dreadnought broadside
+az180 replaces vector hull in bosses.js draw(), destructible sections/smoke/fire preserved as
+overlays, section offsets remapped to sprite features + hit-guard widened (hull weak-point at
++0.6h was rejected by old sy+0.5h cap → boss unhittable there, FIXED, all 5 sections verified
+hittable); tank_lst re-built as real LST via primitives (build_lst.py) — Meshy gave generic
+warship last round. FOLLOW-UPS: LST/LCVP untextured-gray (fine at scale), boss scars
+approximate not pixel-perfect, balance still hot, grep-contract cleanup owed.)
+Prior: Round 5 @94c1f73 — head-on facings az290/270 w/ aim_vec fix,
 LCVP primitive-built in Blender after 2 Meshy refusals (build_lcvp.py, +beached ramp-down
 frame/beachedSprite hook), tank_lst delivery def (pure JSON disgorge), heli
 approach→bob→strafe behavior, sea foam wakes. FOLLOW-UPS: LST is a generic warship not true

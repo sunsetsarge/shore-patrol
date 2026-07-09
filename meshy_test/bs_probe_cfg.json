@@ -1,0 +1,1 @@
+{"out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_r6", "res": 1024, "units": [{"name": "bs90", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/battleship.glb", "frames": 1, "azimuth_deg": 90, "elev_deg": 8}, {"name": "bs270", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/battleship.glb", "frames": 1, "azimuth_deg": 270, "elev_deg": 8}]}

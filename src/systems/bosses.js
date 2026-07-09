@@ -6,8 +6,15 @@
 //   game.bossSplashCallback(weapon, worldX, worldD)
 //   game.bossAirTargetCallback(aimX, aimY, currentBestDist) -> {target,dist} or null
 import { project, CONSTANTS } from '../engine/renderer.js';
+import * as Sprites from '../engine/sprites.js';
 
 const { CANVAS_W, CANVAS_H, SEA_Y, HORIZON_Y } = CONSTANTS;
+
+// Rendered 3D battleship broadside sprite (bow to the right, matching the
+// section layout). Drawn as the hull base; destructible sections + smoke +
+// turret fire are layered on top so the destructible-section gameplay is
+// unchanged. Falls back to the vector hull if the image isn't loaded.
+const BATTLESHIP_SPRITE = 'assets/frames/battleship.png';
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp01(v) { return Math.max(0, Math.min(1, v)); }
@@ -86,12 +93,15 @@ class BattleshipBoss {
   sectionScreenPos(name, sx, sy, scale) {
     const w = this.worldW * scale;
     const h = this.worldH * scale;
+    // Offsets tuned to sit on the 3D battleship sprite's features (bow to the
+    // RIGHT): forward guns on the fore deck (+x), aft gun (-x), bridge/masts
+    // just above center, hull weak-point at the waterline, funnels amidships.
     const offsets = {
-      fwdTurret:  { rx:  0.32, ry: -0.65 },
-      rearTurret: { rx: -0.32, ry: -0.65 },
-      bridge:     { rx:  0.04, ry: -1.90 },
-      hullPort:   { rx:  0.00, ry:  0.00 },
-      engine:     { rx: -0.38, ry: -0.20 },
+      fwdTurret:  { rx:  0.26, ry:  0.30 },
+      rearTurret: { rx: -0.28, ry:  0.30 },
+      bridge:     { rx:  0.03, ry: -0.25 },
+      hullPort:   { rx:  0.00, ry:  0.60 },
+      engine:     { rx: -0.12, ry:  0.05 },
     };
     const off = offsets[name] || { rx: 0, ry: 0 };
     return { x: sx + off.rx * w, y: sy + off.ry * h };
@@ -113,9 +123,10 @@ class BattleshipBoss {
     const { sx, sy, scale } = this.screenPos();
     const h = this.worldH * scale;
     const w = this.worldW * scale;
-    // Coarse rect guard first
+    // Coarse rect guard first. Bounds match the 3D-sprite section layout:
+    // hull weak-point sits at +0.60h (waterline), masts reach ~-0.6h.
     if (clickX < sx - w * 0.6 || clickX > sx + w * 0.6) return null;
-    if (clickY > sy + h * 0.5  || clickY < sy - h * 2.5) return null;
+    if (clickY > sy + h * 1.1  || clickY < sy - h * 1.3) return null;
     // Test each alive section
     for (const [name, sec] of Object.entries(this.sections)) {
       if (sec.dead) continue;
@@ -265,71 +276,64 @@ class BattleshipBoss {
     ctx.translate(sx, sy);
     if (s.hullPort.dead) ctx.rotate(this.listAngle);
 
-    // ── Hull ─────────────────────────────────────────────────────────────
-    ctx.fillStyle = '#3a3a45';
-    ctx.beginPath();
-    ctx.moveTo(-w / 2, 0);
-    ctx.lineTo(-w / 2 + 12 * scale, -h * 0.48);
-    ctx.lineTo(w / 2 - 16 * scale, -h * 0.48);
-    ctx.lineTo(w / 2, 0);
-    ctx.closePath();
-    ctx.fill();
-    // Deck stripe
-    ctx.strokeStyle = '#55556a'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(-w/2+8, -h*0.15); ctx.lineTo(w/2-8, -h*0.15); ctx.stroke();
-    // Hull highlight (waterline)
-    ctx.strokeStyle = '#2a2a38'; ctx.lineWidth = 1;
-    ctx.strokeRect(-w/2, 0, w, 1);
+    const bsImg = Sprites.get(BATTLESHIP_SPRITE);
+    if (bsImg) {
+      // ── 3D battleship sprite (bow to the right) ────────────────────────
+      // Anchor so the sprite's waterline (~12% up from its bottom) sits at
+      // y=0; the superstructure/masts rise above. drawW spans the hull
+      // footprint (worldW). Section hit-zones + damage overlays layer on top.
+      const drawW = w * 1.04;
+      const drawH = drawW * (bsImg.naturalHeight / bsImg.naturalWidth);
+      const waterFrac = 0.12; // fraction of sprite height below the waterline
+      ctx.drawImage(bsImg, -drawW / 2, -drawH * (1 - waterFrac), drawW, drawH);
 
-    // ── Bridge / conning tower ──────────────────────────────────────────
-    if (!s.bridge.dead) {
-      ctx.fillStyle = '#4a4a58';
-      ctx.fillRect(-w * 0.065, -h * 1.75, w * 0.13, h * 1.35);
-      // Windows row
-      ctx.fillStyle = '#888899';
-      for (let i = 0; i < 3; i++) {
-        ctx.fillRect(-w*0.048 + i * w*0.035, -h*1.55, w*0.022, h*0.18);
+      // Destroyed sections: dark blast scar over the sprite (smoke handled
+      // below). Section offsets are in the same local space as the sprite.
+      const scars = {
+        fwdTurret:  { rx:  0.26, ry:  0.30, r: 0.34 },
+        rearTurret: { rx: -0.28, ry:  0.30, r: 0.30 },
+        bridge:     { rx:  0.03, ry: -0.25, r: 0.34 },
+        hullPort:   { rx:  0.00, ry:  0.55, r: 0.50 },
+        engine:     { rx: -0.12, ry:  0.05, r: 0.28 },
+      };
+      for (const [name, sec] of Object.entries(s)) {
+        if (!sec.dead) continue;
+        const sc = scars[name]; if (!sc) continue;
+        ctx.save();
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = '#141414';
+        ctx.beginPath();
+        ctx.arc(sc.rx * w, sc.ry * h, sc.r * h, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = '#ff6a2a'; // ember glow
+        ctx.beginPath();
+        ctx.arc(sc.rx * w, sc.ry * h, sc.r * h * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
-      // Antenna mast
-      ctx.strokeStyle = '#777'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(0, -h*1.75); ctx.lineTo(0, -h*2.6); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-8, -h*2.35); ctx.lineTo(8, -h*2.35); ctx.stroke();
     } else {
-      // Burning ruin stub
-      ctx.fillStyle = '#1e1e1e';
-      ctx.fillRect(-w*0.065, -h*0.48, w*0.13, h*0.28);
-    }
-
-    // ── Forward turret ──────────────────────────────────────────────────
-    if (!s.fwdTurret.dead) {
-      ctx.fillStyle = '#555566';
-      ctx.beginPath(); ctx.arc(w*0.32, -h*0.65, h*0.35, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#333'; ctx.lineWidth = h*0.18;
-      ctx.beginPath(); ctx.moveTo(w*0.32, -h*0.65); ctx.lineTo(w*0.32, h*0.55); ctx.stroke();
-      // Barrel detail
-      ctx.strokeStyle = '#222'; ctx.lineWidth = h*0.08;
-      ctx.beginPath(); ctx.moveTo(w*0.30, -h*0.55); ctx.lineTo(w*0.30, h*0.45); ctx.stroke();
-    } else {
-      ctx.fillStyle = '#1a1a1a'; // Destroyed turret ruins
-      ctx.beginPath(); ctx.arc(w*0.32, -h*0.65, h*0.2, 0, Math.PI*2); ctx.fill();
-    }
-
-    // ── Rear turret ─────────────────────────────────────────────────────
-    if (!s.rearTurret.dead) {
-      ctx.fillStyle = '#555566';
-      ctx.beginPath(); ctx.arc(-w*0.32, -h*0.65, h*0.30, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#333'; ctx.lineWidth = h*0.15;
-      ctx.beginPath(); ctx.moveTo(-w*0.32, -h*0.65); ctx.lineTo(-w*0.32, h*0.45); ctx.stroke();
-    } else {
-      ctx.fillStyle = '#1a1a1a';
-      ctx.beginPath(); ctx.arc(-w*0.32, -h*0.65, h*0.18, 0, Math.PI*2); ctx.fill();
-    }
-
-    // ── Engine section (visible as exhaust stacks at stern) ─────────────
-    if (!s.engine.dead) {
-      ctx.fillStyle = '#3a3a48';
-      ctx.fillRect(-w*0.46, -h*0.40, w*0.10, h*0.35);
-      ctx.fillRect(-w*0.38, -h*0.40, w*0.08, h*0.28);
+      // Fallback: original vector hull (unchanged) if the sprite isn't loaded.
+      ctx.fillStyle = '#3a3a45';
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, 0);
+      ctx.lineTo(-w / 2 + 12 * scale, -h * 0.48);
+      ctx.lineTo(w / 2 - 16 * scale, -h * 0.48);
+      ctx.lineTo(w / 2, 0);
+      ctx.closePath();
+      ctx.fill();
+      if (!s.bridge.dead) {
+        ctx.fillStyle = '#4a4a58';
+        ctx.fillRect(-w * 0.065, -h * 1.75, w * 0.13, h * 1.35);
+      }
+      if (!s.fwdTurret.dead) {
+        ctx.fillStyle = '#555566';
+        ctx.beginPath(); ctx.arc(w*0.32, -h*0.65, h*0.35, 0, Math.PI*2); ctx.fill();
+      }
+      if (!s.rearTurret.dead) {
+        ctx.fillStyle = '#555566';
+        ctx.beginPath(); ctx.arc(-w*0.32, -h*0.65, h*0.30, 0, Math.PI*2); ctx.fill();
+      }
     }
 
     ctx.restore();

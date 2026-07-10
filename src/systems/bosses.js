@@ -81,10 +81,12 @@ class BattleshipBoss {
     // Fixed depth d keeps the hull in the sea band — it never beaches; you
     // sink it. (Old behaviour crept toward shore from the horizon, which put
     // the oversized superstructure up in the sky and read as "sliding".)
-    this.d       = 0.52;               // fixed water depth (in the sea band)
-    this.x       = 1.7;                // start off the right edge
-    this.targetX = 0.28;              // stop slightly right of centre
-    this.slideSpeed = 0.16;           // world-x/sec glide-in
+    this.d       = 0.20;               // fixed water depth — LOW in the sea band so
+                                       // the hull sits ON the water near the shore,
+                                       // not up in the open-water/sky haze.
+    this.x       = 1.5;                // start off the right edge
+    this.targetX = 0.12;              // stop near centre, in front of the player
+    this.slideSpeed = 0.18;           // world-x/sec glide-in (purely horizontal)
     this.arrived = false;
     this.beached = false;             // kept for compatibility; never set true
     this.listAngle = 0;                 // visual tilt when hull destroyed

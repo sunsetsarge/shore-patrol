@@ -1,6 +1,15 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-10 (Round 8 committed @823a8f7, NOT yet deployed — BATTLESHIP HITBOXES + DAMAGE
+Updated: 2026-07-10 (R8.2 DEPLOYED — Z-ORDER FIX. Ammo crates (and beach enemies) fell BEHIND
+the battleship because Bosses.draw ran AFTER the entity/crate loop. Split it: Bosses.draw
+(ship/fire/smoke/shells/flashes) now runs right after the ambient water, BEFORE entities+crates,
+so foreground objects render in front; the screen-fixed section-HP panel moved to a new
+Bosses.drawHud() called with the HUD so it stays on top. GOTCHA I hit: first commit added the new
+pre-entity draw but left the OLD post-entity call → boss drew TWICE (2nd on top of crates); caught
+it on the LIVE curl (two Bosses.draw lines), removed the stale one, redeployed. Live now has 1
+draw + 1 drawHud. Screenshot-verified crates render in front of hull+superstructure+fire, HP panel
+intact. LIVE @ (this deploy).
+Prior: 2026-07-10 (Round 8 committed @823a8f7 — BATTLESHIP HITBOXES + DAMAGE
 FX. Section hit-zones were mapped with POSITIVE ry (below the waterline origin) so every hitbox
 sat on the SAND below the hull, and the bridge sat on the hull side. Root-caused + fixed:
 replaced the two drifting offset tables (sectionScreenPos + draw scars) with ONE module-level
@@ -120,6 +129,7 @@ console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding)
 ## Session log
 | Date | Model | What happened (1 line) | Confluence ver |
 |---|---|---|---|
+| 2026-07-10 | Opus 4.8 | R8.2: z-order — boss ship draws before foreground so crates/enemies render in front (split Bosses.draw/drawHud); fixed a double-draw I introduced; DEPLOYED | (pending) |
 | 2026-07-10 | Opus 4.8 | R8.1 @b6cac27: lowered battleship into the water (d 0.52→0.20); diagnosed "ship in sky" as STALE DEPLOY (live was R6); **DEPLOYED R7+R8+R8.1 to shore-patrol.web.app**, live-verified horizontal+low | (pending) |
 | 2026-07-10 | Opus 4.8 | R8 @823a8f7: fixed battleship section hitboxes (were on the sand, bridge on hull side) via SHIP_FEATURES single-source-of-truth; damage FX = scorch+fire+smoke+embers + damaged-hull swap; verified | (pending) |
 | 2026-07-10 | Opus 4.8 | R7 @17e60fa: battleship glides in from right & holds offshore, cannon muzzle-flashes+shells, tide/whitecaps match painted waterline, new tripod MG icon; verified, NOT yet deployed | (pending) |

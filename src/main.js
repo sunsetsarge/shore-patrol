@@ -308,6 +308,11 @@ function renderPlaying(ctx, game) {
   if (game.whitecaps && game.whitecaps.length > 0) Renderer.drawWhitecaps(ctx, game.whitecaps);
   Renderer.drawTidal(ctx, game.tidalPhase || 0);
 
+  // Boss SHIP (world) — far out in the water, so it draws BEFORE the foreground
+  // entities/crates that land on the beach in front of it. Its HP panel is a
+  // screen-fixed HUD, drawn later via Bosses.drawHud so it stays on top.
+  Bosses.draw(ctx, game);
+
   // draw entities sorted far-to-near (by d desc) so nearer overlaps farther
   const drawList = [...game.entities, ...game.crates];
   drawList.sort((a, b) => {
@@ -395,6 +400,7 @@ function renderPlaying(ctx, game) {
   const weapon = Turret.activeWeapon(game.turret);
   Renderer.drawReticle(ctx, game.turret.aimX, game.turret.aimY, weapon.reticle, weapon.color);
 
+  Bosses.drawHud(ctx, game); // boss section-HP panel — screen-fixed, on top
   HUD.render(ctx, game);
   UpgradeSystem.draw(ctx, game); // upgrade panel on top of everything
 }

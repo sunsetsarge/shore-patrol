@@ -504,8 +504,13 @@ class BattleshipBoss {
       ctx.beginPath(); ctx.arc(x, y, sh.heavy ? 6 : 4, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
+    // NOTE: the section HP panel is a screen-fixed HUD element and is drawn
+    // separately via drawHud() so the WORLD ship can render behind foreground
+    // entities/crates while the panel stays on top of everything.
+  }
 
-    // ── Section HP bars ─────────────────────────────────────────────────
+  // Screen-fixed HUD (section HP panel). Drawn late, with the rest of the HUD.
+  drawHud(ctx) {
     this._drawHpBars(ctx);
   }
 
@@ -1003,10 +1008,22 @@ export function update(game, dt) {
 /**
  * Draw all bosses. Call from main.js renderPlaying() after entity draw loop.
  */
+// World draw: the ship hull, sections, fire, smoke, shells, muzzle flashes.
+// Call this BEFORE foreground entities/crates so the far-water boss renders
+// behind them (crates fall on the beach, in front of the ship).
 export function draw(ctx, game) {
   if (!game.bosses) return;
   for (const boss of game.bosses) {
     boss.draw(ctx);
+  }
+}
+
+// Screen-fixed HUD (section HP panels). Call this LATE, with the rest of the
+// HUD, so it's never occluded by falling crates or close entities.
+export function drawHud(ctx, game) {
+  if (!game.bosses) return;
+  for (const boss of game.bosses) {
+    if (boss.drawHud) boss.drawHud(ctx);
   }
 }
 

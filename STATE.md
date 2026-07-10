@@ -32,6 +32,13 @@ data/juice.json value changes the effect on reload, smooth with ~40 entities+par
 console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding), F (asset diet
 256px+WebP <2MB), G (single-file build — add loader shims first), H (itch package).
 
+## DEPLOY
+- LIVE: https://shore-patrol.web.app — DEPLOYED 2026-07-09 @da98ac9 (R4-R6 now live; was
+  stale at 7aba79b pre-R4, which caused the "still geometric battleship" report).
+- firebase.json now sends no-cache on html/js/json → future `firebase deploy` is instantly live.
+- Deploy cmd: `firebase deploy --only hosting` (CLI at %APPDATA%\npm\firebase, project claude-5273b).
+- Local: play.bat/play.ps1 now use serve_nocache.py (no stale-cache in local dev either).
+
 ## BLAINE GATES
 - [ ] Confirm the shipping NAME before any public/monetized publish (agent default placeholder:
       "SHORE PATROL"; "Beach Head" is a live trademark — Access Software 1983 / Digital Fusion).

@@ -15,6 +15,21 @@
       "**/*.glb",
       "**/*.log",
       "**/*.txt"
+    ],
+    "headers": [
+      {
+        "//": "Never serve stale game code/data. Assets change names rarely and the game is small, so no-cache everywhere keeps every deploy instantly live (no more phantom 'still broken' from a cached bundle).",
+        "source": "**/*.@(html|js|json)",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
+        "source": "**/*.@(png|webp|jpg|jpeg|gif|svg)",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      }
     ]
   }
 }

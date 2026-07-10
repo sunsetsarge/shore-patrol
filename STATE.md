@@ -1,6 +1,17 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-10 (R8.2 DEPLOYED — Z-ORDER FIX. Ammo crates (and beach enemies) fell BEHIND
+Updated: 2026-07-10 (R8.3 DEPLOYED — OFFSHORE PLACEMENT + MAIN GUNS TRAINED ON PLAYER. (1) d
+0.20→0.40: 0.20 beached the hull on the sand (over-corrected from the earlier "in the sky" which
+was actually stale-deploy); 0.40 floats it offshore with a clear water gap (hull bottom ~377 vs
+surf ~404). (2) The broadside sprite's cast turrets point along the hull, so the guns never
+"faced the player" — added _drawMainGuns: a dark barbette dome over each main turret (hides the
+sprite's side barrels) + twin heavy barrels angled DOWN toward a below-centre player aim point,
+muzzle flash at the barrel tips on fire (fwdFlash/rearFlash pulse in _fireShell); shells now leave
+from the trained muzzles (shared MAIN_GUN_AIM_DY=3.2 / MAIN_GUN_LEN=0.78). Retired the old
+base-of-turret cone flash. Screenshot-verified offshore + guns-on-player, no errors. Depth history
+for future me: d=0.52 sy337 (fine, the "sky" report was STALE R6), d=0.20 sy388 BEACHED, d=0.40
+sy356 = the keeper.
+Prior: 2026-07-10 (R8.2 DEPLOYED — Z-ORDER FIX. Ammo crates (and beach enemies) fell BEHIND
 the battleship because Bosses.draw ran AFTER the entity/crate loop. Split it: Bosses.draw
 (ship/fire/smoke/shells/flashes) now runs right after the ambient water, BEFORE entities+crates,
 so foreground objects render in front; the screen-fixed section-HP panel moved to a new
@@ -129,6 +140,7 @@ console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding)
 ## Session log
 | Date | Model | What happened (1 line) | Confluence ver |
 |---|---|---|---|
+| 2026-07-10 | Opus 4.8 | R8.3: battleship floats offshore (d 0.20→0.40, was beached) + main guns trained on player (barbette domes + player-facing barrels + tip muzzle flash); DEPLOYED | (pending) |
 | 2026-07-10 | Opus 4.8 | R8.2: z-order — boss ship draws before foreground so crates/enemies render in front (split Bosses.draw/drawHud); fixed a double-draw I introduced; DEPLOYED | (pending) |
 | 2026-07-10 | Opus 4.8 | R8.1 @b6cac27: lowered battleship into the water (d 0.52→0.20); diagnosed "ship in sky" as STALE DEPLOY (live was R6); **DEPLOYED R7+R8+R8.1 to shore-patrol.web.app**, live-verified horizontal+low | (pending) |
 | 2026-07-10 | Opus 4.8 | R8 @823a8f7: fixed battleship section hitboxes (were on the sand, bridge on hull side) via SHIP_FEATURES single-source-of-truth; damage FX = scorch+fire+smoke+embers + damaged-hull swap; verified | (pending) |

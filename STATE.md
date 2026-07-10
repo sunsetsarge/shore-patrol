@@ -1,6 +1,37 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-09 (Round 6 shipped @02d3712 — 3D BATTLESHIP BOSS: Meshy dreadnought broadside
+Updated: 2026-07-10 (Round 8 committed @823a8f7, NOT yet deployed — BATTLESHIP HITBOXES + DAMAGE
+FX. Section hit-zones were mapped with POSITIVE ry (below the waterline origin) so every hitbox
+sat on the SAND below the hull, and the bridge sat on the hull side. Root-caused + fixed:
+replaced the two drifting offset tables (sectionScreenPos + draw scars) with ONE module-level
+SHIP_FEATURES table in normalized sprite (u,v) coords + featureLocal() that mirrors the
+drawImage() placement exactly — single source of truth so hit-test/scars/fire/smoke can't drift
+again. Measured features off the sprite silhouette profile: fwdTurret(0.22,0.60),
+bridge(0.44,0.34=superstructure), engine(0.55,0.50=funnels), rearTurret(0.79,0.60),
+hullPort(0.50,0.78). Verified headless: all 5 sections hit-test correctly, sand+sky clicks miss.
+DAMAGE FX overhaul: concentric circles → scorched craters + additive flickering fire (_drawWreck)
++ billowing gradient smoke (expands & greys rising) + rising ember sparks; NEW battleship_damaged.png
+(post-processed: darkened/desat + soot streaks + blast craters w/ ember cores) swaps in when
+critical (hull dead or ≥3 sections gone). Screenshot-verified: fires sit ON the turret/bridge/
+funnels with smoke columns, no console errors. FOLLOW-UPS: baked craters in the damaged sprite are
+at fixed spots (don't track which sections actually died — live _drawWreck fires do); R7 STILL not
+deployed either; ~9s slide-in still long; grep-contract pre-existing violations owed.)
+Prior: 2026-07-10 (Round 7 committed @17e60fa, NOT yet deployed — BATTLESHIP BEHAVIOR +
+TIDE + MG ICON. Boss now: spawns off-screen right (x=1.7) in the water (d=0.52), glides in to
+targetX=0.28 and holds on-station in front of the player — never beaches, never "starts in the
+sky"; fire gated on arrival. Shells emit from the turret section positions (nudged toward player)
+and muzzle flashes draw as downward flame cones at each gun, so cannons read as firing AT the
+player (the sprite is a fixed broadside render — barrels can't physically rotate, the flash+shell
+origin sells it). Section offsets + hull scars flipped bow-LEFT to match the az0 battleship.png.
+TIDE FIX: measured the painted background waterline (high-left y≈345 → low-right y≈440); drawTidal
+had the MIRROR-INVERTED slope (leftY=435/rightY=405) so foam cut diagonally across the surf —
+now matches; whitecaps spawn against the same sloped line so left-side foam no longer lands on
+sand. NEW MG ICON: Meshy twin .50-cal (wpn_mg2, az225 render) replaces the dark cone-pedestal
+turret that "looked strange" — barrel+visible bore now reads clearly as a gun. All headless- and
+screenshot-verified; zero console errors. FOLLOW-UPS: ~9s slide-in is a long dramatic entrance
+(shorten slideSpeed if playtesters find it slow); LST/LCVP still untextured-gray; grep-contract
+pre-existing violations in upgradeSystem.js/debug API still owed.)
+Prior: 2026-07-09 (Round 6 shipped @02d3712 — 3D BATTLESHIP BOSS: Meshy dreadnought broadside
 az180 replaces vector hull in bosses.js draw(), destructible sections/smoke/fire preserved as
 overlays, section offsets remapped to sprite features + hit-guard widened (hull weak-point at
 +0.6h was rejected by old sy+0.5h cap → boss unhittable there, FIXED, all 5 sections verified
@@ -33,8 +64,9 @@ console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding)
 256px+WebP <2MB), G (single-file build — add loader shims first), H (itch package).
 
 ## DEPLOY
-- LIVE: https://shore-patrol.web.app — DEPLOYED 2026-07-09 @da98ac9 (R4-R6 now live; was
-  stale at 7aba79b pre-R4, which caused the "still geometric battleship" report).
+- LIVE: https://shore-patrol.web.app — DEPLOYED 2026-07-09 @da98ac9 (R4-R6). **R7 @17e60fa AND
+  R8 @823a8f7 are committed but NOT yet deployed** — one `firebase deploy --only hosting` pushes
+  both (battleship behavior/tide/MG + hitbox/damage-FX fixes) live (no-cache headers make it instant).
 - firebase.json now sends no-cache on html/js/json → future `firebase deploy` is instantly live.
 - Deploy cmd: `firebase deploy --only hosting` (CLI at %APPDATA%\npm\firebase, project claude-5273b).
 - Local: play.bat/play.ps1 now use serve_nocache.py (no stale-cache in local dev either).
@@ -83,6 +115,8 @@ console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding)
 ## Session log
 | Date | Model | What happened (1 line) | Confluence ver |
 |---|---|---|---|
+| 2026-07-10 | Opus 4.8 | R8 @823a8f7: fixed battleship section hitboxes (were on the sand, bridge on hull side) via SHIP_FEATURES single-source-of-truth; damage FX = scorch+fire+smoke+embers + damaged-hull swap; verified, NOT yet deployed | (pending) |
+| 2026-07-10 | Opus 4.8 | R7 @17e60fa: battleship glides in from right & holds offshore, cannon muzzle-flashes+shells, tide/whitecaps match painted waterline, new tripod MG icon; verified, NOT yet deployed | (pending) |
 | 2026-07-07 | Opus 4.8 | Full eval + FINISH_PLAN + ROADMAP + research; eval page 82935817; about to execute A/B | eval p.82935817 |
 | 2026-07-04 | Fable 5 | Round-3 playtest fixes + craft-only landings + pause (@4af11d7) | main p.80511033 v1.5 |
 | 2026-07-04 | Fable 5 | Phase 1 pre-rendered 3D sprites (Meshy+Blender) + Phase 2 polish | v1.3, v1.4 |

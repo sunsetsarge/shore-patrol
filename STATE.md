@@ -1,6 +1,22 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-10 (R8.3 DEPLOYED — OFFSHORE PLACEMENT + MAIN GUNS TRAINED ON PLAYER. (1) d
+Updated: 2026-07-10 (R8.4 DEPLOYED — FLOAT FIX + VECTOR GUNS REMOVED; player-facing-guns
+re-render ABANDONED. (1) d 0.40→0.55: the painted waterline SLOPES (high-left y345→low-right
+y440) and the flat keel spans most of the width, so at 0.40 the bow beached while the stern
+floated; 0.55 clears the keel above the waterline across the WHOLE hull (bow +26/mid +45/stern
++63 px, verified). The whole 0.52→0.20→0.40→0.55 saga = I misread the original "in the sky"
+report (which was a STALE R6 DEPLOY, not the depth) and drove d the wrong way. 0.55 is the keeper;
+DON'T lower it. (2) Removed the vector gun barrels/domes (_drawMainGuns) — flat 2D shapes on the
+photoreal rendered hull looked ridiculous; kept only a soft additive muzzle-flash GLOW at the
+turrets on fire. (3) DEAD END, do not retry: tried re-rendering the ship with player-facing main
+guns by adding 3D barrel geometry to battleship.glb in Blender (build_battleship_guns.py, renders
+in meshy_test/renders_guns/). The GLB is ONE fused 152k-vert mesh (turrets NOT separable), and a
+BROADSIDE camera fundamentally can't show guns aimed at the player without foreshortening into
+awkward poles — every aim tried (toward-camera, down, down-forward) looked worse than the clean
+ship. CONCLUSION: keep the clean broadside ship (authentic Beach Head look). Only remaining
+untried idea = re-render the whole ship from a BOW-QUARTER angle (¾ view "bearing down"), which
+changes the look + needs slide-in/section-map re-tune — Blaine-gated, not started.
+Prior: 2026-07-10 (R8.3 DEPLOYED — OFFSHORE PLACEMENT + MAIN GUNS TRAINED ON PLAYER. (1) d
 0.20→0.40: 0.20 beached the hull on the sand (over-corrected from the earlier "in the sky" which
 was actually stale-deploy); 0.40 floats it offshore with a clear water gap (hull bottom ~377 vs
 surf ~404). (2) The broadside sprite's cast turrets point along the hull, so the guns never
@@ -140,6 +156,7 @@ console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding)
 ## Session log
 | Date | Model | What happened (1 line) | Confluence ver |
 |---|---|---|---|
+| 2026-07-10 | Opus 4.8 | R8.4: d=0.55 floats whole hull (0.40 beached the bow on the sloped waterline); removed ridiculous vector guns; player-facing-gun re-render attempted + abandoned (fused mesh + broadside foreshortening); DEPLOYED clean ship | (pending) |
 | 2026-07-10 | Opus 4.8 | R8.3: battleship floats offshore (d 0.20→0.40, was beached) + main guns trained on player (barbette domes + player-facing barrels + tip muzzle flash); DEPLOYED | (pending) |
 | 2026-07-10 | Opus 4.8 | R8.2: z-order — boss ship draws before foreground so crates/enemies render in front (split Bosses.draw/drawHud); fixed a double-draw I introduced; DEPLOYED | (pending) |
 | 2026-07-10 | Opus 4.8 | R8.1 @b6cac27: lowered battleship into the water (d 0.52→0.20); diagnosed "ship in sky" as STALE DEPLOY (live was R6); **DEPLOYED R7+R8+R8.1 to shore-patrol.web.app**, live-verified horizontal+low | (pending) |

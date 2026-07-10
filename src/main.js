@@ -345,8 +345,9 @@ function renderPlaying(ctx, game) {
     }
   }
 
-  // Boss entities (drawn above water, below turret/HUD)
-  Bosses.draw(ctx, game);
+  // (Boss SHIP is now drawn earlier, before the entity/crate loop, so foreground
+  // crates/entities render in front of it. Its HP panel is drawn later, with the
+  // HUD, via Bosses.drawHud.)
 
   // projectiles
   for (const p of game.projectiles) {

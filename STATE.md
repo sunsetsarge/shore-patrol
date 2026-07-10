@@ -64,9 +64,14 @@ console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding)
 256px+WebP <2MB), G (single-file build — add loader shims first), H (itch package).
 
 ## DEPLOY
-- LIVE: https://shore-patrol.web.app — DEPLOYED 2026-07-09 @da98ac9 (R4-R6). **R7 @17e60fa AND
-  R8 @823a8f7 are committed but NOT yet deployed** — one `firebase deploy --only hosting` pushes
-  both (battleship behavior/tide/MG + hitbox/damage-FX fixes) live (no-cache headers make it instant).
+- LIVE: https://shore-patrol.web.app — **DEPLOYED 2026-07-10 @b6cac27 (R7 + R8 + R8.1 now live)**.
+  Verified on the live site: boss d===0.20 constant, sy constant 388 (zero vertical movement),
+  slides in horizontally, sits low with its waterline at the surf. Prior live was da98ac9 (R4-R6),
+  whose OLD depth-animating boss ("comes from the horizon, drops down") was the "ship in the sky /
+  moves vertically" the user reported — it was a STALE-DEPLOY artifact, not a code bug (R7 had
+  already fixed the motion; it just wasn't pushed). Lesson: after committing a gameplay/visual fix,
+  DEPLOY (or tell Blaine it's localhost-only) — don't leave the live site stale.
+- Deploy cmd: `"C:/Users/blain/AppData/Roaming/npm/firebase" deploy --only hosting` (project claude-5273b).
 - firebase.json now sends no-cache on html/js/json → future `firebase deploy` is instantly live.
 - Deploy cmd: `firebase deploy --only hosting` (CLI at %APPDATA%\npm\firebase, project claude-5273b).
 - Local: play.bat/play.ps1 now use serve_nocache.py (no stale-cache in local dev either).
@@ -115,7 +120,8 @@ console errors, screenshot mid-explosion. Then D (audio), E (balance/onboarding)
 ## Session log
 | Date | Model | What happened (1 line) | Confluence ver |
 |---|---|---|---|
-| 2026-07-10 | Opus 4.8 | R8 @823a8f7: fixed battleship section hitboxes (were on the sand, bridge on hull side) via SHIP_FEATURES single-source-of-truth; damage FX = scorch+fire+smoke+embers + damaged-hull swap; verified, NOT yet deployed | (pending) |
+| 2026-07-10 | Opus 4.8 | R8.1 @b6cac27: lowered battleship into the water (d 0.52→0.20); diagnosed "ship in sky" as STALE DEPLOY (live was R6); **DEPLOYED R7+R8+R8.1 to shore-patrol.web.app**, live-verified horizontal+low | (pending) |
+| 2026-07-10 | Opus 4.8 | R8 @823a8f7: fixed battleship section hitboxes (were on the sand, bridge on hull side) via SHIP_FEATURES single-source-of-truth; damage FX = scorch+fire+smoke+embers + damaged-hull swap; verified | (pending) |
 | 2026-07-10 | Opus 4.8 | R7 @17e60fa: battleship glides in from right & holds offshore, cannon muzzle-flashes+shells, tide/whitecaps match painted waterline, new tripod MG icon; verified, NOT yet deployed | (pending) |
 | 2026-07-07 | Opus 4.8 | Full eval + FINISH_PLAN + ROADMAP + research; eval page 82935817; about to execute A/B | eval p.82935817 |
 | 2026-07-04 | Fable 5 | Round-3 playtest fixes + craft-only landings + pause (@4af11d7) | main p.80511033 v1.5 |

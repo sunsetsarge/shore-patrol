@@ -42,11 +42,19 @@ class BattleshipBoss {
   constructor(stageId, bossScale) {
     this.stageId = stageId;
     this.scale   = bossScale || 1.0;    // 1.5 for the stage-9 dreadnought
-    this.x       = 0;                   // world x: centered
-    this.d       = 1.0;                 // world d: starts at horizon (sea)
-    this.speed   = 0.0035;             // world-d units/sec → ~4 min to reach shore
-    this.beached = false;
+    // Movement: sail in from OFF the right edge and stop on-station in the
+    // water in front of the player (bow points left = direction of travel).
+    // Fixed depth d keeps the hull in the sea band — it never beaches; you
+    // sink it. (Old behaviour crept toward shore from the horizon, which put
+    // the oversized superstructure up in the sky and read as "sliding".)
+    this.d       = 0.52;               // fixed water depth (in the sea band)
+    this.x       = 1.7;                // start off the right edge
+    this.targetX = 0.28;              // stop slightly right of centre
+    this.slideSpeed = 0.16;           // world-x/sec glide-in
+    this.arrived = false;
+    this.beached = false;             // kept for compatibility; never set true
     this.listAngle = 0;                 // visual tilt when hull destroyed
+    this.muzzleFlashes = [];           // {x, y, life, big}
 
     // Ship dimensions (virtual world units, scaled to canvas in draw)
     // 5× bigger so the dreadnought fills ~55% of canvas width when beached
@@ -94,14 +102,14 @@ class BattleshipBoss {
     const w = this.worldW * scale;
     const h = this.worldH * scale;
     // Offsets tuned to sit on the 3D battleship sprite's features (bow to the
-    // RIGHT): forward guns on the fore deck (+x), aft gun (-x), bridge/masts
-    // just above center, hull weak-point at the waterline, funnels amidships.
+    // LEFT — direction of travel): forward guns on the fore deck (-x), aft gun
+    // (+x), bridge/masts just above center, hull weak-point at the waterline.
     const offsets = {
-      fwdTurret:  { rx:  0.26, ry:  0.30 },
-      rearTurret: { rx: -0.28, ry:  0.30 },
-      bridge:     { rx:  0.03, ry: -0.25 },
+      fwdTurret:  { rx: -0.26, ry:  0.30 },
+      rearTurret: { rx:  0.28, ry:  0.30 },
+      bridge:     { rx: -0.03, ry: -0.25 },
       hullPort:   { rx:  0.00, ry:  0.60 },
-      engine:     { rx: -0.12, ry:  0.05 },
+      engine:     { rx:  0.12, ry:  0.05 },
     };
     const off = offsets[name] || { rx: 0, ry: 0 };
     return { x: sx + off.rx * w, y: sy + off.ry * h };
@@ -161,10 +169,16 @@ class BattleshipBoss {
   update(game, dt) {
     this._syncSectionWorldPos();
 
-    // Move toward shore
-    if (!this.beached) {
-      this.d -= this.speed * dt;
-      if (this.d <= 0.12) { this.d = 0.12; this.beached = true; }
+    // Glide in from off the right edge, then stop on-station in the water.
+    if (!this.arrived) {
+      this.x -= this.slideSpeed * dt;
+      if (this.x <= this.targetX) { this.x = this.targetX; this.arrived = true; }
+    }
+
+    // Tick muzzle flashes
+    for (let i = this.muzzleFlashes.length - 1; i >= 0; i--) {
+      this.muzzleFlashes[i].life -= dt;
+      if (this.muzzleFlashes[i].life <= 0) this.muzzleFlashes.splice(i, 1);
     }
 
     // List (tilt) if hull damaged
@@ -198,8 +212,8 @@ class BattleshipBoss {
       if (p.life <= 0) this.smokeParticles.splice(i, 1);
     }
 
-    // Forward turret fire (slow, heavy)
-    if (this.alive && !this.sections.fwdTurret.dead) {
+    // Forward turret fire (slow, heavy) — only once on-station
+    if (this.alive && this.arrived && !this.sections.fwdTurret.dead) {
       this.fwdFireTimer -= dt;
       const rate = this.sections.bridge.dead ? 0.5 : 1.0;
       if (this.fwdFireTimer <= 0) {
@@ -207,8 +221,8 @@ class BattleshipBoss {
         this._fireShell(game, 'fwdTurret', 18, 'heavy');
       }
     }
-    // Rear turret fire (faster, lighter)
-    if (this.alive && !this.sections.rearTurret.dead) {
+    // Rear turret fire (faster, lighter) — only once on-station
+    if (this.alive && this.arrived && !this.sections.rearTurret.dead) {
       this.rearFireTimer -= dt;
       const rate = this.sections.bridge.dead ? 0.5 : 1.0;
       if (this.rearFireTimer <= 0) {
@@ -255,15 +269,21 @@ class BattleshipBoss {
     const w = this.worldW * scale;
     const h = this.worldH * scale;
     const sp = this.sectionScreenPos(turretName, sx, sy, scale);
-    // Target: random point along the beach/shore line
+    // Shell muzzle point: from the turret, nudged toward the player (down) so
+    // it clearly leaves the gun rather than the deck.
+    const muzX = sp.x;
+    const muzY = sp.y + h * 0.12;
+    // Target: the beach/shore line in front of the player.
     const tx = 200 + Math.random() * 880;
     const ty = 650 + Math.random() * 40;
     this.shells.push({
-      sx: sp.x, sy: sp.y, tx, ty,
+      sx: muzX, sy: muzY, tx, ty,
       t: 0, life: 2.0 + Math.random() * 0.5,
       damage, heavy: kind === 'heavy',
     });
-    game.audio && game.audio.play('rapidFire');
+    // Muzzle flash at the gun, angled down toward the player.
+    this.muzzleFlashes.push({ x: muzX, y: muzY, life: 0.12, big: kind === 'heavy' });
+    game.audio && game.audio.play(kind === 'heavy' ? 'heavyBoom' : 'rapidFire');
   }
 
   draw(ctx) {
@@ -290,11 +310,11 @@ class BattleshipBoss {
       // Destroyed sections: dark blast scar over the sprite (smoke handled
       // below). Section offsets are in the same local space as the sprite.
       const scars = {
-        fwdTurret:  { rx:  0.26, ry:  0.30, r: 0.34 },
-        rearTurret: { rx: -0.28, ry:  0.30, r: 0.30 },
-        bridge:     { rx:  0.03, ry: -0.25, r: 0.34 },
+        fwdTurret:  { rx: -0.26, ry:  0.30, r: 0.34 },
+        rearTurret: { rx:  0.28, ry:  0.30, r: 0.30 },
+        bridge:     { rx: -0.03, ry: -0.25, r: 0.34 },
         hullPort:   { rx:  0.00, ry:  0.55, r: 0.50 },
-        engine:     { rx: -0.12, ry:  0.05, r: 0.28 },
+        engine:     { rx:  0.12, ry:  0.05, r: 0.28 },
       };
       for (const [name, sec] of Object.entries(s)) {
         if (!sec.dead) continue;
@@ -345,6 +365,26 @@ class BattleshipBoss {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = '#111';
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // ── Muzzle flashes (at the guns, angled down toward the player) ──────
+    ctx.save();
+    for (const m of this.muzzleFlashes) {
+      const t = m.life / 0.12; // 1→0
+      const R = (m.big ? 26 : 16) * (0.6 + t * 0.6);
+      ctx.globalAlpha = t;
+      // bright core
+      ctx.fillStyle = '#fff4c0';
+      ctx.beginPath(); ctx.arc(m.x, m.y, R * 0.5, 0, Math.PI*2); ctx.fill();
+      // orange flame cone pointing down at the player
+      ctx.fillStyle = '#ffae2e';
+      ctx.beginPath();
+      ctx.moveTo(m.x - R * 0.5, m.y);
+      ctx.lineTo(m.x + R * 0.5, m.y);
+      ctx.lineTo(m.x, m.y + R * 1.6);
+      ctx.closePath(); ctx.fill();
     }
     ctx.globalAlpha = 1;
     ctx.restore();

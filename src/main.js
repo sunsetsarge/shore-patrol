@@ -172,8 +172,12 @@ function updateAmbience(game, dt) {
   if (game.whitecapTimer <= 0) {
     game.whitecapTimer = 0.3 + Math.random() * 0.7;
     const wx = Math.random() * CANVAS_W_MAIN;
-    const wy = HORIZON_Y + Math.random() * (SEA_Y_MAIN - HORIZON_Y);
-    const t = (wy - HORIZON_Y) / (SEA_Y_MAIN - HORIZON_Y);
+    // The painted waterline is a sloped trapezoid (high-left y≈345 → low-right
+    // y≈440), so cap each whitecap's near edge at the local water depth instead
+    // of a flat SEA_Y — otherwise left-side foam spawns on the sand.
+    const waterY = 345 + 95 * (wx / CANVAS_W_MAIN);
+    const wy = HORIZON_Y + Math.random() * (waterY - HORIZON_Y);
+    const t = (wy - HORIZON_Y) / (waterY - HORIZON_Y);
     const maxLife = 0.8 + Math.random() * 1.2;
     game.whitecaps.push({
       x: wx, y: wy,

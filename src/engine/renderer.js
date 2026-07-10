@@ -831,13 +831,15 @@ export function drawClouds(ctx, clouds) {
 }
 
 // -------------------- Tidal wave wash — perspective-angled shoreline ----------
-// Background has diagonal perspective (lower-left → upper-right), so the
-// waterline is not flat: left edge sits 15 px BELOW SEA_Y, right edge 15 px ABOVE.
+// The painted background waterline (blue water → wet sand) is NOT flat and NOT
+// symmetric: measured across the art it runs high on the LEFT (y≈345) down to
+// low on the RIGHT (y≈440). Match those endpoints exactly so the animated foam
+// line rides on the painted surf instead of cutting across it diagonally.
 export function drawTidal(ctx, tidalPhase) {
   const washExtent = 12;
   const phase      = tidalPhase;
-  const leftY      = SEA_Y + 15;   // lower-left (near shore, closer to player)
-  const rightY     = SEA_Y - 15;   // upper-right (receding perspective)
+  const leftY      = 345;   // upper-left (surf recedes into the distance)
+  const rightY     = 440;   // lower-right (surf nearest the player)
 
   function waveY(px) {
     const t    = px / CANVAS_W;

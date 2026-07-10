@@ -1,0 +1,9 @@
+{
+ "out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_mg2",
+ "res": 768,
+ "units": [
+  { "name": "wpn_mg2_az135", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/wpn_mg2.glb", "frames": 1, "azimuth_deg": 135, "elev_deg": 18 },
+  { "name": "wpn_mg2_az225", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/wpn_mg2.glb", "frames": 1, "azimuth_deg": 225, "elev_deg": 18 },
+  { "name": "wpn_mg2_az315", "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/wpn_mg2.glb", "frames": 1, "azimuth_deg": 315, "elev_deg": 18 }
+ ]
+}

@@ -39,12 +39,6 @@ const SHIP_FEATURES = {
   hullPort:   { u: 0.50, v: 0.78, hitR: 0.60, fxR: 0.46 }, // hull waterline
 };
 
-// Main-battery barrels are drawn TRAINED ON THE PLAYER: from each main turret
-// toward an aim point below-centre, so a broadside hull still reads as "its guns
-// are pointed at you". Shared by _drawMainGuns() and _fireShell().
-const MAIN_GUN_AIM_DY = 3.2;  // aim point Y, in ship-heights below the origin
-const MAIN_GUN_LEN    = 0.78; // barrel length, in ship-heights
-
 // Convert a sprite (u,v) to a LOCAL pixel offset from the ship origin, given the
 // on-screen ship width w. Mirrors the drawImage() placement exactly.
 function featureLocal(u, v, w) {
@@ -87,12 +81,15 @@ class BattleshipBoss {
     // Fixed depth d keeps the hull in the sea band — it never beaches; you
     // sink it. (Old behaviour crept toward shore from the horizon, which put
     // the oversized superstructure up in the sky and read as "sliding".)
-    this.d       = 0.40;               // fixed water depth — OFFSHORE in the sea
-                                       // band: floats on open water with a clear
-                                       // gap to the beach (d=0.20 beached it;
-                                       // d≈0.5+ read as sky-high/far).
+    this.d       = 0.55;               // fixed water depth. The painted waterline
+                                       // SLOPES (high-left ~y345 → low-right ~y440)
+                                       // and the flat keel spans most of the width,
+                                       // so the whole hull only clears the high-left
+                                       // waterline at d≳0.52 — below that the bow
+                                       // beaches while the stern floats. 0.55 = safe
+                                       // margin, ship floating fully offshore.
     this.x       = 1.8;                // start off the right edge
-    this.targetX = 0.10;              // stop near centre, in front of the player
+    this.targetX = 0.05;              // stop near centre, in front of the player
     this.slideSpeed = 0.18;           // world-x/sec glide-in (purely horizontal)
     this.arrived = false;
     this.beached = false;             // kept for compatibility; never set true
@@ -335,14 +332,9 @@ class BattleshipBoss {
     const { sx, sy, scale } = this.screenPos();
     const h = this.worldH * scale;
     const sp = this.sectionScreenPos(turretName, sx, sy, scale);
-    // The main guns are TRAINED ON THE PLAYER (aim point below-centre), so a
-    // shell leaves from the barrel MUZZLE — down toward the player — matching
-    // the drawn barrels in _drawMainGuns (same aim point + barrel length).
-    const aimX = sx, aimY = sy + h * MAIN_GUN_AIM_DY;
-    let dx = aimX - sp.x, dy = aimY - sp.y;
-    const dlen = Math.hypot(dx, dy) || 1; dx /= dlen; dy /= dlen;
-    const muzX = sp.x + dx * h * MAIN_GUN_LEN;
-    const muzY = sp.y + dy * h * MAIN_GUN_LEN;
+    // Shell leaves the turret, nudged toward the player so it reads as outgoing.
+    const muzX = sp.x;
+    const muzY = sp.y + h * 0.10;
     // Target: the beach/shore line in front of the player.
     const tx = 200 + Math.random() * 880;
     const ty = 650 + Math.random() * 40;
@@ -351,68 +343,10 @@ class BattleshipBoss {
       t: 0, life: 2.0 + Math.random() * 0.5,
       damage, heavy: kind === 'heavy',
     });
-    // Recoil/flash on the firing battery — drawn at the barrel tips.
+    // Muzzle-flash glow on the firing turret (a soft glow, not drawn barrels).
     if (turretName === 'fwdTurret') this.fwdFlash = 1;
     else if (turretName === 'rearTurret') this.rearFlash = 1;
     game.audio && game.audio.play(kind === 'heavy' ? 'heavyBoom' : 'rapidFire');
-  }
-
-  // Draw the two main-battery turrets TRAINED ON THE PLAYER, over the broadside
-  // sprite (whose cast turrets point along the hull). A dark barbette dome hides
-  // the sprite turret; twin barrels angle down toward the player aim point, with
-  // a muzzle flash at the tips when that battery fires. LOCAL space (inside the
-  // ship transform). w,h = on-screen ship size.
-  _drawMainGuns(ctx, w, h) {
-    const aimX = 0, aimY = h * MAIN_GUN_AIM_DY;      // player aim point (local)
-    const barrelLen = h * MAIN_GUN_LEN;
-    const barrelW = h * 0.085;                       // heavy naval-gun barrels
-    const spread = h * 0.15;
-    const guns = [
-      { key: 'fwdTurret', flash: this.fwdFlash },
-      { key: 'rearTurret', flash: this.rearFlash },
-    ];
-    for (const g of guns) {
-      if (this.sections[g.key].dead) continue;       // destroyed → fire, not guns
-      const f = SHIP_FEATURES[g.key];
-      const o = featureLocal(f.u, f.v, w);
-      const cx = o.dx, cy = o.dy;
-      let dx = aimX - cx, dy = aimY - cy;
-      const dlen = Math.hypot(dx, dy) || 1; dx /= dlen; dy /= dlen;
-      const px = -dy, py = dx;                        // perpendicular (barrel spacing)
-      const recoil = g.flash * h * 0.06;             // kick back on firing
-      ctx.save();
-      // Barbette dome over the sprite turret
-      ctx.fillStyle = '#242429';
-      ctx.beginPath(); ctx.ellipse(cx, cy, h * 0.30, h * 0.21, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#34343d';
-      ctx.beginPath(); ctx.ellipse(cx, cy - h * 0.03, h * 0.25, h * 0.16, 0, 0, Math.PI * 2); ctx.fill();
-      // Twin barrels toward the player
-      for (const s of [-1, 1]) {
-        const bx = cx + px * spread * 0.5 * s - dx * recoil;
-        const by = cy + py * spread * 0.5 * s - dy * recoil;
-        const tipX = bx + dx * barrelLen, tipY = by + dy * barrelLen;
-        ctx.strokeStyle = '#191920'; ctx.lineWidth = barrelW; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tipX, tipY); ctx.stroke();
-        ctx.strokeStyle = '#45454f'; ctx.lineWidth = barrelW * 0.35;   // top highlight
-        ctx.beginPath();
-        ctx.moveTo(bx + px * barrelW * 0.22, by + py * barrelW * 0.22);
-        ctx.lineTo(tipX + px * barrelW * 0.22, tipY + py * barrelW * 0.22);
-        ctx.stroke();
-        if (g.flash > 0.02) {
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          const fr = h * 0.20 * (0.5 + g.flash * 0.7);
-          const gr = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, fr);
-          gr.addColorStop(0,   `rgba(255,248,210,${g.flash})`);
-          gr.addColorStop(0.4, `rgba(255,165,45,${g.flash * 0.8})`);
-          gr.addColorStop(1,   'rgba(255,80,20,0)');
-          ctx.fillStyle = gr;
-          ctx.beginPath(); ctx.arc(tipX, tipY, fr, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
-        }
-      }
-      ctx.restore();
-    }
   }
 
   // Draw a wrecked, on-fire section at LOCAL (cx,cy), radius R. Called inside the
@@ -480,8 +414,22 @@ class BattleshipBoss {
       const drawH = drawW * SHIP_ASPECT;
       ctx.drawImage(bsImg, -drawW / 2, -drawH * (1 - SPRITE_WATERFRAC), drawW, drawH);
 
-      // Main batteries trained on the player (over the broadside sprite turrets)
-      this._drawMainGuns(ctx, w, h);
+      // Muzzle-flash glow at the main turrets when they fire — a soft additive
+      // glow (NOT drawn barrels), so it composites cleanly over the rendered ship.
+      for (const [key, flash] of [['fwdTurret', this.fwdFlash], ['rearTurret', this.rearFlash]]) {
+        if (flash <= 0.02 || s[key].dead) continue;
+        const f = SHIP_FEATURES[key]; const o = featureLocal(f.u, f.v, w);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const fr = h * 0.30 * (0.5 + flash * 0.6);
+        const gr = ctx.createRadialGradient(o.dx, o.dy, 0, o.dx, o.dy, fr);
+        gr.addColorStop(0,   `rgba(255,240,170,${flash})`);
+        gr.addColorStop(0.5, `rgba(255,150,40,${flash * 0.6})`);
+        gr.addColorStop(1,   'rgba(255,80,20,0)');
+        ctx.fillStyle = gr;
+        ctx.beginPath(); ctx.arc(o.dx, o.dy, fr, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
 
       // Destroyed sections: scorched crater + live fire, positioned on the real
       // ship feature (featureLocal), sized by the feature's fxR.
@@ -546,8 +494,8 @@ class BattleshipBoss {
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    // (Main-battery muzzle flashes are drawn at the barrel tips inside
-    // _drawMainGuns, in the ship-local transform above.)
+    // (Main-turret muzzle-flash glows are drawn on the sprite, in the ship-local
+    // transform above.)
 
     // ── In-flight shells ────────────────────────────────────────────────
     ctx.save();

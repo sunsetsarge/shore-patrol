@@ -15,6 +15,40 @@ const { CANVAS_W, CANVAS_H, SEA_Y, HORIZON_Y } = CONSTANTS;
 // turret fire are layered on top so the destructible-section gameplay is
 // unchanged. Falls back to the vector hull if the image isn't loaded.
 const BATTLESHIP_SPRITE = 'assets/frames/battleship.png';
+// Battle-damaged variant, swapped in once the ship is critically wounded.
+const BATTLESHIP_DMG_SPRITE = 'assets/frames/battleship_damaged.png';
+
+// ── Sprite geometry (must match the drawImage() call in draw()) ──────────────
+// battleship.png is 900×264, drawn drawW = 1.04·shipWidth wide with its waterline
+// anchored at the ship origin (waterFrac up from the sprite's bottom edge).
+const SHIP_ASPECT      = 264 / 900; // natural h / w
+const SPRITE_DRAWW_FRAC = 1.04;     // drawW / shipWidth(w)
+const SPRITE_WATERFRAC  = 0.12;     // sprite fraction below the waterline
+
+// Ship features in NORMALIZED SPRITE coords — u: bow-left→stern-right, v: top→
+// bottom of battleship.png. This is the SINGLE source of truth: hit-test, blast
+// scars, fire and smoke all derive their position from here, so the damage map
+// can never drift away from the art again (it did — old offsets used +ry, which
+// is BELOW the waterline origin, dropping every hit-zone onto the sand).
+// hitR / fxR are fractions of ship height h.
+const SHIP_FEATURES = {
+  fwdTurret:  { u: 0.22, v: 0.60, hitR: 0.34, fxR: 0.30 }, // forward main guns
+  bridge:     { u: 0.44, v: 0.34, hitR: 0.32, fxR: 0.30 }, // superstructure / mast
+  engine:     { u: 0.55, v: 0.50, hitR: 0.30, fxR: 0.30 }, // funnels / machinery
+  rearTurret: { u: 0.79, v: 0.60, hitR: 0.32, fxR: 0.28 }, // aft main guns
+  hullPort:   { u: 0.50, v: 0.78, hitR: 0.60, fxR: 0.46 }, // hull waterline
+};
+
+// Convert a sprite (u,v) to a LOCAL pixel offset from the ship origin, given the
+// on-screen ship width w. Mirrors the drawImage() placement exactly.
+function featureLocal(u, v, w) {
+  const drawW = SPRITE_DRAWW_FRAC * w;
+  const drawH = drawW * SHIP_ASPECT;
+  return {
+    dx: drawW * (u - 0.5),
+    dy: drawH * (v - (1 - SPRITE_WATERFRAC)), // origin sits at the waterline
+  };
+}
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 function clamp01(v) { return Math.max(0, Math.min(1, v)); }
@@ -66,9 +100,12 @@ class BattleshipBoss {
     this.rearFireTimer = 1.5 + Math.random() * 2;
     this.shells        = []; // { sx, sy, tx, ty, t, life, damage }
 
-    // Damage smoke plumes on destroyed sections
-    this.smokeParticles = []; // { rx, ry, life, maxLife, r }
+    // Damage FX on destroyed sections
+    this.smokeParticles = []; // { x, y, vx, vy, life, maxLife, r, r0 }
+    this.embers = [];         // { x, y, vx, vy, life, maxLife }
     this.smokeTimer = 0;
+    this.emberTimer = 0;
+    this.animT = 0;           // free-running clock for fire flicker
 
     // Score value for complete destruction
     this.scoreValue = this.scale >= 1.5 ? 8000 : 5000;
@@ -97,32 +134,19 @@ class BattleshipBoss {
     return project(this.x, this.d, 0, 'sea');
   }
 
-  // Screen-space position of a named section, given ship's projected (sx,sy,scale)
+  // Screen-space position of a named section, given ship's projected (sx,sy,scale).
+  // Anchored to real sprite features via SHIP_FEATURES (see featureLocal()).
   sectionScreenPos(name, sx, sy, scale) {
     const w = this.worldW * scale;
-    const h = this.worldH * scale;
-    // Offsets tuned to sit on the 3D battleship sprite's features (bow to the
-    // LEFT — direction of travel): forward guns on the fore deck (-x), aft gun
-    // (+x), bridge/masts just above center, hull weak-point at the waterline.
-    const offsets = {
-      fwdTurret:  { rx: -0.26, ry:  0.30 },
-      rearTurret: { rx:  0.28, ry:  0.30 },
-      bridge:     { rx: -0.03, ry: -0.25 },
-      hullPort:   { rx:  0.00, ry:  0.60 },
-      engine:     { rx:  0.12, ry:  0.05 },
-    };
-    const off = offsets[name] || { rx: 0, ry: 0 };
-    return { x: sx + off.rx * w, y: sy + off.ry * h };
+    const f = SHIP_FEATURES[name] || { u: 0.5, v: 0.7 };
+    const o = featureLocal(f.u, f.v, w);
+    return { x: sx + o.dx, y: sy + o.dy };
   }
 
-  // Hit radii (fraction of ship height)
+  // Hit radius (fraction of ship height h)
   sectionHitRadius(name, h) {
-    const radii = {
-      fwdTurret:  0.40, rearTurret: 0.38,
-      bridge:     0.30, hullPort:   0.70,
-      engine:     0.32,
-    };
-    return h * (radii[name] || 0.35);
+    const f = SHIP_FEATURES[name];
+    return h * ((f && f.hitR) || 0.35);
   }
 
   // Test a screen click against all alive sections. Returns the section or null.
@@ -131,10 +155,11 @@ class BattleshipBoss {
     const { sx, sy, scale } = this.screenPos();
     const h = this.worldH * scale;
     const w = this.worldW * scale;
-    // Coarse rect guard first. Bounds match the 3D-sprite section layout:
-    // hull weak-point sits at +0.60h (waterline), masts reach ~-0.6h.
+    // Coarse rect guard first. Bounds match the sprite feature layout: the
+    // bridge/mast reaches ~-1.35h above the waterline origin, the hull weak-point
+    // sits just above it (~+0.4h with its radius).
     if (clickX < sx - w * 0.6 || clickX > sx + w * 0.6) return null;
-    if (clickY > sy + h * 1.1  || clickY < sy - h * 1.3) return null;
+    if (clickY > sy + h * 0.9  || clickY < sy - h * 1.5) return null;
     // Test each alive section
     for (const [name, sec] of Object.entries(this.sections)) {
       if (sec.dead) continue;
@@ -175,6 +200,8 @@ class BattleshipBoss {
       if (this.x <= this.targetX) { this.x = this.targetX; this.arrived = true; }
     }
 
+    this.animT += dt; // fire flicker clock
+
     // Tick muzzle flashes
     for (let i = this.muzzleFlashes.length - 1; i >= 0; i--) {
       this.muzzleFlashes[i].life -= dt;
@@ -186,30 +213,62 @@ class BattleshipBoss {
       this.listAngle = lerp(this.listAngle, 0.18, dt * 2);
     }
 
-    // Spawn persistent smoke from destroyed sections
+    const deadCount = Object.values(this.sections).filter(s => s.dead).length;
+    const { sx, sy, scale } = this.screenPos();
+    const h = this.worldH * scale;
+
+    // Billowing smoke columns from destroyed sections (denser = more wrecked)
     this.smokeTimer -= dt;
-    if (this.smokeTimer <= 0) {
-      this.smokeTimer = 0.15 + Math.random() * 0.2;
+    if (this.smokeTimer <= 0 && deadCount > 0) {
+      this.smokeTimer = 0.09 + Math.random() * 0.10;
       for (const [name, sec] of Object.entries(this.sections)) {
         if (!sec.dead) continue;
-        const { sx, sy, scale } = this.screenPos();
+        const f = SHIP_FEATURES[name];
         const sp = this.sectionScreenPos(name, sx, sy, scale);
+        const r0 = h * (0.16 + Math.random() * 0.12) * (f ? f.fxR / 0.3 : 1);
         this.smokeParticles.push({
-          x: sp.x + (Math.random() - 0.5) * 14,
-          y: sp.y,
-          vx: (Math.random() - 0.5) * 12,
-          vy: -20 - Math.random() * 25,
-          life: 1.4 + Math.random() * 0.6, maxLife: 2.0,
-          r: 9 + Math.random() * 8,
+          x: sp.x + (Math.random() - 0.5) * h * 0.25,
+          y: sp.y - h * 0.1,
+          vx: (Math.random() - 0.5) * 14 - 6,     // drift with the sea breeze
+          vy: -26 - Math.random() * 30,
+          life: 1.6 + Math.random() * 1.0, maxLife: 2.6,
+          r0, r: r0,
+          shade: 30 + Math.random() * 30,          // grey value
         });
       }
     }
-
     for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
       const p = this.smokeParticles[i];
       p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vy *= (1 - dt * 0.4);                       // slows as it rises
       p.life -= dt;
+      const age = 1 - p.life / p.maxLife;
+      p.r = p.r0 * (1 + age * 2.2);                  // expand as it billows
       if (p.life <= 0) this.smokeParticles.splice(i, 1);
+    }
+
+    // Rising embers/sparks from destroyed sections
+    this.emberTimer -= dt;
+    if (this.emberTimer <= 0 && deadCount > 0) {
+      this.emberTimer = 0.05 + Math.random() * 0.08;
+      for (const [name, sec] of Object.entries(this.sections)) {
+        if (!sec.dead || Math.random() > 0.6) continue;
+        const sp = this.sectionScreenPos(name, sx, sy, scale);
+        this.embers.push({
+          x: sp.x + (Math.random() - 0.5) * h * 0.3,
+          y: sp.y,
+          vx: (Math.random() - 0.5) * 30,
+          vy: -50 - Math.random() * 60,
+          life: 0.5 + Math.random() * 0.6, maxLife: 1.1,
+        });
+      }
+    }
+    for (let i = this.embers.length - 1; i >= 0; i--) {
+      const e = this.embers[i];
+      e.x += e.vx * dt; e.y += e.vy * dt;
+      e.vy += 90 * dt;                               // gravity pulls sparks back
+      e.life -= dt;
+      if (e.life <= 0) this.embers.splice(i, 1);
     }
 
     // Forward turret fire (slow, heavy) — only once on-station
@@ -286,6 +345,45 @@ class BattleshipBoss {
     game.audio && game.audio.play(kind === 'heavy' ? 'heavyBoom' : 'rapidFire');
   }
 
+  // Draw a wrecked, on-fire section at LOCAL (cx,cy), radius R. Called inside the
+  // ship-local transform: scorched crater + flickering fire. (Smoke & embers are
+  // world-space, drawn after the transform is popped.)
+  _drawWreck(ctx, cx, cy, R) {
+    const t = this.animT;
+    const phase = cx * 0.05;
+    // 1) Scorched crater — several dark irregular blobs so it isn't a clean disc.
+    ctx.save();
+    const blobs = [[0, 0, 1.0], [-0.4, -0.15, 0.6], [0.45, 0.1, 0.55], [0.05, 0.35, 0.5]];
+    for (const [ox, oy, rf] of blobs) {
+      const bx = cx + ox * R, by = cy + oy * R, br = R * rf;
+      const gr = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+      gr.addColorStop(0,   'rgba(12,10,9,0.92)');
+      gr.addColorStop(0.7, 'rgba(22,18,15,0.7)');
+      gr.addColorStop(1,   'rgba(22,18,15,0)');
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    // 2) Live fire — additive flame tongues flickering in size & brightness.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const flick = 0.75 + 0.25 * Math.sin(t * 18 + phase) + 0.12 * Math.sin(t * 37 + phase * 2);
+    const tongues = [[0, 0, 1.0], [-0.35, -0.1, 0.7], [0.32, -0.05, 0.75]];
+    for (const [ox, oy, rf] of tongues) {
+      const fr = R * 0.85 * rf * flick;
+      const fx = cx + ox * R;
+      const fy = cy + oy * R - fr * 0.3;            // flames lean upward
+      const gr = ctx.createRadialGradient(fx, fy + fr * 0.3, 0, fx, fy, fr);
+      gr.addColorStop(0,    'rgba(255,244,180,0.95)'); // white-hot core
+      gr.addColorStop(0.35, 'rgba(255,170,40,0.8)');   // orange
+      gr.addColorStop(0.7,  'rgba(220,60,20,0.45)');   // deep red
+      gr.addColorStop(1,    'rgba(180,30,10,0)');
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   draw(ctx) {
     const { sx, sy, scale } = this.screenPos();
     const w = this.worldW * scale;
@@ -296,41 +394,29 @@ class BattleshipBoss {
     ctx.translate(sx, sy);
     if (s.hullPort.dead) ctx.rotate(this.listAngle);
 
-    const bsImg = Sprites.get(BATTLESHIP_SPRITE);
+    // Swap to the battle-damaged hull once the ship is heavily wounded, so the
+    // base art itself reads as wrecked (not just decals stamped on a pristine
+    // ship). Falls back to the clean sprite if the damaged one isn't loaded.
+    const deadCount = Object.values(s).filter(x => x.dead).length;
+    const critical  = s.hullPort.dead || deadCount >= 3;
+    const dmgImg    = Sprites.get(BATTLESHIP_DMG_SPRITE);
+    const bsImg     = (critical && dmgImg) ? dmgImg : Sprites.get(BATTLESHIP_SPRITE);
     if (bsImg) {
-      // ── 3D battleship sprite (bow to the right) ────────────────────────
-      // Anchor so the sprite's waterline (~12% up from its bottom) sits at
-      // y=0; the superstructure/masts rise above. drawW spans the hull
-      // footprint (worldW). Section hit-zones + damage overlays layer on top.
-      const drawW = w * 1.04;
-      const drawH = drawW * (bsImg.naturalHeight / bsImg.naturalWidth);
-      const waterFrac = 0.12; // fraction of sprite height below the waterline
-      ctx.drawImage(bsImg, -drawW / 2, -drawH * (1 - waterFrac), drawW, drawH);
+      // ── 3D battleship sprite (bow to the LEFT) ─────────────────────────
+      // Anchor so the sprite's waterline (waterFrac up from its bottom) sits at
+      // y=0; the superstructure/masts rise above. Section hit-zones + damage
+      // overlays layer on top, all keyed to SHIP_FEATURES via featureLocal().
+      const drawW = w * SPRITE_DRAWW_FRAC;
+      const drawH = drawW * SHIP_ASPECT;
+      ctx.drawImage(bsImg, -drawW / 2, -drawH * (1 - SPRITE_WATERFRAC), drawW, drawH);
 
-      // Destroyed sections: dark blast scar over the sprite (smoke handled
-      // below). Section offsets are in the same local space as the sprite.
-      const scars = {
-        fwdTurret:  { rx: -0.26, ry:  0.30, r: 0.34 },
-        rearTurret: { rx:  0.28, ry:  0.30, r: 0.30 },
-        bridge:     { rx: -0.03, ry: -0.25, r: 0.34 },
-        hullPort:   { rx:  0.00, ry:  0.55, r: 0.50 },
-        engine:     { rx:  0.12, ry:  0.05, r: 0.28 },
-      };
+      // Destroyed sections: scorched crater + live fire, positioned on the real
+      // ship feature (featureLocal), sized by the feature's fxR.
       for (const [name, sec] of Object.entries(s)) {
         if (!sec.dead) continue;
-        const sc = scars[name]; if (!sc) continue;
-        ctx.save();
-        ctx.globalAlpha = 0.75;
-        ctx.fillStyle = '#141414';
-        ctx.beginPath();
-        ctx.arc(sc.rx * w, sc.ry * h, sc.r * h, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = '#ff6a2a'; // ember glow
-        ctx.beginPath();
-        ctx.arc(sc.rx * w, sc.ry * h, sc.r * h * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        const f = SHIP_FEATURES[name]; if (!f) continue;
+        const o = featureLocal(f.u, f.v, w);
+        this._drawWreck(ctx, o.dx, o.dy, f.fxR * h);
       }
     } else {
       // Fallback: original vector hull (unchanged) if the sprite isn't loaded.
@@ -358,13 +444,31 @@ class BattleshipBoss {
 
     ctx.restore();
 
-    // ── Damage smoke plumes ─────────────────────────────────────────────
+    // ── Damage smoke plumes (soft, billowing, greying as they rise) ──────
     ctx.save();
     for (const p of this.smokeParticles) {
-      const alpha = Math.max(0, p.life / p.maxLife) * 0.6;
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#111';
+      const lifeT = Math.max(0, p.life / p.maxLife);
+      const age = 1 - lifeT;
+      const alpha = Math.sin(lifeT * Math.PI) * 0.5;   // fade in AND out
+      const g = Math.round((p.shade || 40) + age * 60); // darkens→greys with age
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+      grad.addColorStop(0,   `rgba(${g},${g},${g},${alpha})`);
+      grad.addColorStop(0.6, `rgba(${g},${g},${g},${alpha * 0.5})`);
+      grad.addColorStop(1,   `rgba(${g},${g},${g},0)`);
+      ctx.fillStyle = grad;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+
+    // ── Embers/sparks rising off the fires ──────────────────────────────
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const e of this.embers) {
+      const t = Math.max(0, e.life / e.maxLife);
+      ctx.globalAlpha = t;
+      ctx.fillStyle = t > 0.5 ? '#ffe08a' : '#ff7a1e';
+      const r = 1.2 + t * 1.8;
+      ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI*2); ctx.fill();
     }
     ctx.globalAlpha = 1;
     ctx.restore();

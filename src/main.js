@@ -91,7 +91,8 @@ function addSpritePaths(paths, sprite) {
 function collectSpritePaths(data) {
   const paths = new Set();
   paths.add('assets/background.png');
-  paths.add('assets/frames/battleship.png'); // battleship boss hull (bosses.js)
+  paths.add('assets/frames/battleship.png');          // battleship boss hull (bosses.js)
+  paths.add('assets/frames/battleship_damaged.png');  // battle-damaged swap (bosses.js)
   for (const e of data.enemies.enemies) {
     addSpritePaths(paths, e.sprite);
     addSpritePaths(paths, e.deathSprite);

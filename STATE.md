@@ -1,6 +1,17 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-10 (R8.4 DEPLOYED — FLOAT FIX + VECTOR GUNS REMOVED; player-facing-guns
+Updated: 2026-07-10 (SHIP-LOOP RUNNING — Fable judges, Opus/Sonnet execute per SHIP_PLAN.md.
+Built the Fable-judge harness (screenshot_sink.py :8200 writes shots/<name>.png; inject
+window.saveShot(name)=canvas.toBlob→POST; a `model:"fable"` Agent Reads the PNG + criteria and
+returns PASS/FAIL). DONE + DEPLOYED: W3 enemies fire WHILE advancing (advance_and_fire fires once
+d<=firstFireD, data field; infantry 0.6, tank 0.75) — Fable PASS. W4 shots leave the gun/pylon:
+entityMuzzlePoint() maps per-enemy muzzle{u,v} (sprite-rect fraction, mirror+bank aware) to
+screen; notifyEnemyFire/notifyVolley/spawnTracer emit there (killed the stray feet-blast from
+notifyVolley); muzzle tank{0.5,0.3}=barrel, heli{0.68,0.62}=pylon, infantry{0.58,0.4}=rifle;
+bigger flash — Fable PASS all 3. NEXT (SHIP_PLAN §4): W1 bomber 3D model (BIG, Blender/Meshy —
+bomber+escorts still vector), W2 bomber fly-over-and-exit-top behavior, W5 hitbox audit, W6/W7
+facing+regression+ship. Servers: play.bat (:8123) + `python screenshot_sink.py 8200 shots`.)
+Prior: 2026-07-10 (R8.4 DEPLOYED — FLOAT FIX + VECTOR GUNS REMOVED; player-facing-guns
 re-render ABANDONED. (1) d 0.40→0.55: the painted waterline SLOPES (high-left y345→low-right
 y440) and the flat keel spans most of the width, so at 0.40 the bow beached while the stern
 floated; 0.55 clears the keel above the waterline across the WHOLE hull (bow +26/mid +45/stern

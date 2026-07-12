@@ -53,33 +53,39 @@ contract** (run every workstream): `grep -rniE "howitzer|infantry|helicopter|lan
 
 ---
 
-## 3. Agent-loop architecture
+## 3. Agent-loop architecture  (roles per Blaine 2026-07-10: **Fable judges, Opus/Sonnet execute**)
 
 ```
-            ┌─────────────────────────── Opus (this seat): PLANNER + JUDGE ──────────────┐
-            │  • owns SHIP_PLAN.md + acceptance criteria                                   │
-            │  • dispatches one workstream at a time to a Sonnet worker                    │
-            │  • after each worker returns, RE-VERIFIES: reload no-cache, drive            │
-            │    window.game/debugStep, capture screenshot(s), judge vs criteria          │
-            │  • PASS → next workstream; FAIL → feed the failing screenshot + specific     │
-            │    fix back to a fresh Sonnet worker; repeat (cap 4 iters/workstream)        │
-            └──────────────────────────────────────────────────────────────────────────────┘
-   delegate ↓ (Agent tool, model:"sonnet")                    ↑ return artifacts
-            ┌──────────────── Sonnet worker ────────────────┐
-            │ • edits src/ + data/ for ONE workstream        │
-            │ • MUST forbid nested Agent spawning            │
-            │ • runs node --check + grep contract            │
-            │ • returns: files changed, headless numbers,    │
-            │   and its OWN screenshot (path) — never trust  │
-            │   its prose, Opus re-shoots                     │
-            └────────────────────────────────────────────────┘
-   Blender/Meshy 3D (bomber model)  → Haiku/Sonnet drives meshy_test scripts (bulk, mechanical)
-   Bulk file/log analysis            → gemini-analyzer agent
+   Opus (this seat): ORCHESTRATOR + EXECUTOR
+     • owns SHIP_PLAN.md; runs one workstream at a time
+     • EXECUTES code changes inline (Opus) or delegates mechanical bulk to a Sonnet agent
+     • drives window.game/debugStep, saves the exact screenshot to disk via the sink
+     • hands the saved PNG + criteria to a FABLE judge agent; on FAIL, fixes and re-judges
+     • cap 4 iters/workstream, then escalate + log why it stalled
+
+   Fable (Agent tool, model:"fable"): JUDGE  ── the pixel gate ──
+     • Reads the saved screenshot PNG + the workstream's acceptance criteria
+     • returns strict PASS / FAIL + specific defects (what's wrong, where)
+     • never edits code; judging only. A DIFFERENT model from the executor = real check.
+
+   Sonnet (Agent tool, model:"sonnet"): EXECUTOR for mechanical/bulk work
+     • e.g. driving Blender/Meshy render scripts (W1), batch data edits
+     • MUST forbid nested Agent spawning; runs node --check + grep contract; returns artifacts
+
+   gemini-analyzer agent → bulk file/log analysis when needed
 ```
 
-**Why worker≠judge:** the doer is optimistic; the judge must be a different pass
-that looks at pixels. Opus holds the judge seat because it's the session's top
-model (CLAUDE.md tier routing). Screenshot review is the gate, not green tests.
+**Why worker≠judge:** the doer is optimistic; the judge must be a *different model*
+looking at *pixels*. Fable holds the judge seat (Blaine's call today). Opus never
+judges its own output as "done" — it saves the screenshot and lets Fable rule.
+
+### Screenshot-to-disk harness (so Fable can see pixels)
+`screenshot_sink.py` (port 8200) writes POSTed PNGs to `shots/`. In the page,
+inject `window.saveShot(name)` = `canvas.toBlob → fetch POST → sink writes shots/<name>.png`
+(same-origin canvas ⇒ not tainted). Flow per judge: `debugStep`/spawn to set the
+scene → `saveShot('wN_case')` → spawn Fable agent: "Read shots/wN_case.png, judge
+vs these criteria, return PASS/FAIL + defects." Both servers via `play.bat` + a
+background `python screenshot_sink.py 8200 shots`.
 
 ### Verification harness (every judge pass)
 - Dev server: `play.bat` (serve_nocache.py, port 8123). **It dies mid-session — if `curl -s -o /dev/null -w "%{http_code}" localhost:8123` ≠ 200, restart it in the background before shooting.**

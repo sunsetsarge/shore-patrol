@@ -271,6 +271,38 @@ function drawPartOverlay(ctx, entity, type, sx, sy, drawW, drawH, centerY, bank,
   ctx.restore();
 }
 
+// Screen-space point of an enemy's MUZZLE (gun barrel / missile pylon), so
+// shots + flashes originate from the right part of the sprite, not its centre.
+// `type.muzzle = {u,v}` is a fraction of the drawn sprite rect (u: left→right,
+// v: top→bottom). Replicates drawEntityGlyph's placement (size, per-domain
+// anchor, mirror, bank) so it stays locked to the drawn sprite. Returns the
+// sprite centre if no muzzle is defined.
+export function entityMuzzlePoint(entity, sx, sy, scale) {
+  const type = entity.type || {};
+  const spriteScale = type.spriteScale || 1.0;
+  const drawH = (type.hitbox || 26) * 2.4 * scale * spriteScale;
+  const path = resolveSpritePath(type.sprite, type.spriteFps, entity.age);
+  const img = path ? Sprites.get(path) : null;
+  const aspect = img ? (img.naturalWidth / img.naturalHeight) : 1;
+  const drawW = drawH * aspect;
+  const domain = type.domain;
+  let top;
+  if (domain === 'air') top = sy - drawH / 2;
+  else if (domain === 'sea') { const d01 = clamp01(entity.d || 0); top = sy - drawH * lerp(-0.2, 0.55, 1 - d01); }
+  else top = sy - drawH; // land: bottom-anchored
+  const centerY = top + drawH / 2;
+  const m = type.muzzle;
+  if (!m) return { x: sx, y: centerY };
+  let dx = (m.u - 0.5) * drawW;
+  let dy = (m.v - 0.5) * drawH;
+  if (type.mirrorByHeading && entity.mirrorState) dx = -dx; // face-flip
+  if (type.bankFactor) {                                    // heli body roll
+    const bank = Math.max(-0.17, Math.min(0.17, (entity.headX || 0) * type.bankFactor));
+    if (bank) { const c = Math.cos(bank), s = Math.sin(bank); const rx = dx*c - dy*s, ry = dx*s + dy*c; dx = rx; dy = ry; }
+  }
+  return { x: sx + dx, y: centerY + dy };
+}
+
 export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
   const type = entity.type || {};
   const shape = type.shape;
@@ -881,7 +913,7 @@ export function drawTidal(ctx, tidalPhase) {
 export function drawEnemyMuzzleFlash(ctx, sx, sy, scale, alpha) {
   ctx.save();
   ctx.globalAlpha = Math.max(0, alpha);
-  const r = Math.max(4, 14 * scale);
+  const r = Math.max(9, 26 * scale); // prominent so it reads as the shot's origin
   // Outer glow
   const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
   grad.addColorStop(0, 'rgba(255,240,60,1)');

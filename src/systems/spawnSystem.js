@@ -3,7 +3,7 @@
 // definitions by id from the loaded enemies.json map.
 import { createEntity } from '../engine/entity.js';
 import { movementBehaviors } from './movementBehaviors.js';
-import { project } from '../engine/renderer.js';
+import { project, entityMuzzlePoint } from '../engine/renderer.js';
 
 let enemyDefsById = {};
 
@@ -178,17 +178,25 @@ export function update(game, dt) {
       game.audio && game.audio.play('hit');
     },
     notifyVolley(entity) {
-      game.effects.push({ kind: 'explosion', x: entity.x, d: entity.d, alt: entity.alt, domain: 'land', radiusWorld: 30, life: 0.3, age: 0 });
+      // Muzzle blast at the gun/pylon (W4) — NOT the sprite centre/feet, which
+      // put a stray blast under the tank's tracks.
+      const p = project(entity.x, entity.d, entity.alt, entity.type.domain);
+      const mp = entityMuzzlePoint(entity, p.sx, p.sy, p.scale);
+      game.effects.push({ kind: 'enemy_muzzle', screenX: mp.x, screenY: mp.y, scale: p.scale * 1.4, life: 0.16, age: 0 });
     },
-    // FIX 6: enemy fires — muzzle flash at the entity's world position
+    // Enemy fires — muzzle flash at the sprite's GUN/MUZZLE point (W4), not its
+    // centre. Screen coords stored on the effect; drawn directly (no reproject).
     notifyEnemyFire(entity) {
-      game.effects.push({ kind: 'enemy_muzzle', x: entity.x, d: entity.d, alt: entity.alt, domain: entity.type.domain, life: 0.12, age: 0 });
+      const p = project(entity.x, entity.d, entity.alt, entity.type.domain);
+      const mp = entityMuzzlePoint(entity, p.sx, p.sy, p.scale);
+      game.effects.push({ kind: 'enemy_muzzle', screenX: mp.x, screenY: mp.y, scale: p.scale, life: 0.12, age: 0 });
     },
-    // Round 4 §4: shell/bullet tracer from a firing entity toward the bunker
-    // (screen bottom-center), reusing the existing tracer effect kind.
+    // Tracer/round from the firing entity's MUZZLE toward the bunker (screen
+    // bottom-center), so shots leave the gun barrel / missile pylon.
     spawnTracer(entity) {
-      const { sx, sy } = project(entity.x, entity.d, entity.alt, entity.type.domain);
-      game.effects.push({ kind: 'tracer', x1: sx, y1: sy, x2: 640, y2: 700, color: entity.type.color || '#ffcc66', life: 0.15, age: 0 });
+      const p = project(entity.x, entity.d, entity.alt, entity.type.domain);
+      const mp = entityMuzzlePoint(entity, p.sx, p.sy, p.scale);
+      game.effects.push({ kind: 'tracer', x1: mp.x, y1: mp.y, x2: 640, y2: 700, color: entity.type.color || '#ffcc66', life: 0.15, age: 0 });
     },
     spawnChildren(entity, spawnsOnDeath) {
       spawnChildren(game, entity, spawnsOnDeath, api.difficulty);

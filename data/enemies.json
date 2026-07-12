@@ -45,7 +45,8 @@
       ],
       "fireFps": 8,
       "standoffD": 0.12,
-      "firstFireD": 0.6
+      "firstFireD": 0.6,
+      "muzzle": { "u": 0.58, "v": 0.4 }
     },
     {
       "id": "tank",
@@ -85,7 +86,8 @@
       ],
       "mirrorByHeading": true,
       "standoffD": 0.3,
-      "firstFireD": 0.75
+      "firstFireD": 0.75,
+      "muzzle": { "u": 0.5, "v": 0.3 }
     },
     {
       "id": "landing_craft",
@@ -151,7 +153,8 @@
       ],
       "partMode": "spin",
       "partFps": 24,
-      "bankFactor": 2.5
+      "bankFactor": 2.5,
+      "muzzle": { "u": 0.68, "v": 0.62 }
     },
     {
       "id": "commando",

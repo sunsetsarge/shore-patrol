@@ -374,9 +374,8 @@ function renderPlaying(ctx, game) {
     } else if (fx.kind === 'muzzle') {
       Renderer.drawMuzzleFlash(ctx, game.turret, 1 - t01);
     } else if (fx.kind === 'enemy_muzzle') {
-      // FIX 6: enemy fires — flash at the entity's projected screen position
-      const { sx, sy, scale } = Renderer.project(fx.x, fx.d, fx.alt, fx.domain || 'air');
-      Renderer.drawEnemyMuzzleFlash(ctx, sx, sy, scale, 1 - t01);
+      // W4: flash at the sprite's muzzle point (screen coords stored at fire time)
+      Renderer.drawEnemyMuzzleFlash(ctx, fx.screenX, fx.screenY, fx.scale || 1, 1 - t01);
     }
   }
 

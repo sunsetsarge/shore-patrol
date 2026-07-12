@@ -1,6 +1,17 @@
 # STATE — Beachhead (browser game)
 
-Updated: 2026-07-10 (SHIP-LOOP RUNNING — Fable judges, Opus/Sonnet execute per SHIP_PLAN.md.
+Updated: 2026-07-10 (SHIP-LOOP — W1/W2/W3/W4 ALL DONE + DEPLOYED (Fable-judged). Harness:
+screenshot_sink.py :8200 + window.saveShot → shots/<name>.png → `model:"fable"` Agent judges.
+W3 fire-while-advancing (firstFireD) ✅. W4 shots from gun/pylon (entityMuzzlePoint + per-enemy
+muzzle{u,v}: tank barrel/heli pylon/infantry rifle; killed stray notifyVolley feet-blast) ✅.
+W1 3D bomber+escort (Meshy → Blender belly render nose-down → assets/frames/bomber.png +
+bomber_escort.png; BomberBoss/FighterEscort draw swap, vector fallback) ✅. W2 bomber slower
+(0.028) + fly-OVER-and-exit-top: after arrival climbs off the top & looms; nukeDetonated(loss)
+ONLY once fully off top; shoot-down mid-pass averts it (headless-verified both cases); bomber
+hittable across the whole flyover ✅. Meshy balance 1014. NEXT: W5 finish hitbox audit for the
+other enemies (sprite-rect test from R4 already covers most), W6/W7 facing sweep + regression
+checklist + final ship gate. Servers: play.bat :8123 + `python screenshot_sink.py 8200 shots`.
+Prior: 2026-07-10 (SHIP-LOOP RUNNING — Fable judges, Opus/Sonnet execute per SHIP_PLAN.md.
 Built the Fable-judge harness (screenshot_sink.py :8200 writes shots/<name>.png; inject
 window.saveShot(name)=canvas.toBlob→POST; a `model:"fable"` Agent Reads the PNG + criteria and
 returns PASS/FAIL). DONE + DEPLOYED: W3 enemies fire WHILE advancing (advance_and_fire fires once

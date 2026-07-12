@@ -157,30 +157,38 @@ export const movementBehaviors = {
   advance_and_fire(entity, dt, api) {
     const speed = entity.type.speed * api.difficulty.speed;
     const standoffD = entity.type.standoffD != null ? entity.type.standoffD : 0.25;
+    // Distance at which the enemy opens fire. Defaults to standoff (old
+    // behaviour); set `firstFireD` > standoffD in data to make it shoot WHILE
+    // still advancing (spec: "fire periodically as they advance").
+    const firstFireD = entity.type.firstFireD != null ? entity.type.firstFireD : standoffD;
+    const inRange = entity.d <= firstFireD;
 
+    // Keep advancing toward the standoff line (never stops closing until there).
     if (entity.d > standoffD) {
       entity.d -= speed * dt;
       if (entity.d <= standoffD) entity.d = standoffD;
     } else {
+      // At standoff: gentle lateral drift so it doesn't look frozen.
       if (entity.flags.driftPhase === undefined) entity.flags.driftPhase = Math.random() * Math.PI * 2;
       entity.flags.driftPhase += dt * 0.6;
       if (entity.flags.baseX === undefined) entity.flags.baseX = entity.x;
       entity.x = entity.flags.baseX + Math.sin(entity.flags.driftPhase) * 0.05;
       entity.x = Math.max(-1, Math.min(1, entity.x));
+    }
 
-      // At standoff, face the bunker (screen center) rather than keeping the
-      // last walking direction — firing away from the player reads wrong.
-      if (entity.headX !== undefined) {
-        const toward = entity.x > 0.05 ? -0.02 : entity.x < -0.05 ? 0.02 : 0;
-        entity.headX += (toward - entity.headX) * 0.15;
-      }
+    // Face the bunker (screen center) whenever within firing range — even while
+    // still advancing — so it never fires away from the player.
+    if (inRange && entity.headX !== undefined) {
+      const toward = entity.x > 0.05 ? -0.02 : entity.x < -0.05 ? 0.02 : 0;
+      entity.headX += (toward - entity.headX) * 0.15;
+    }
 
-      if (entity.type.fireInterval > 0) {
-        entity.flags.fireTimer = (entity.flags.fireTimer || 0) + dt;
-        if (entity.flags.fireTimer >= entity.type.fireInterval) {
-          entity.flags.fireTimer = 0;
-          startFiring(entity, api);
-        }
+    // Fire periodically once in range, advancing OR holding at standoff.
+    if (inRange && entity.type.fireInterval > 0) {
+      entity.flags.fireTimer = (entity.flags.fireTimer || 0) + dt;
+      if (entity.flags.fireTimer >= entity.type.fireInterval) {
+        entity.flags.fireTimer = 0;
+        startFiring(entity, api);
       }
     }
     tickFiring(entity, dt);

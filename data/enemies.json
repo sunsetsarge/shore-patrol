@@ -44,7 +44,8 @@
         "assets/frames/infantry_fire_2.png"
       ],
       "fireFps": 8,
-      "standoffD": 0.12
+      "standoffD": 0.12,
+      "firstFireD": 0.6
     },
     {
       "id": "tank",
@@ -83,7 +84,8 @@
         24
       ],
       "mirrorByHeading": true,
-      "standoffD": 0.3
+      "standoffD": 0.3,
+      "firstFireD": 0.75
     },
     {
       "id": "landing_craft",

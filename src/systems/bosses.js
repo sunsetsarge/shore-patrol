@@ -17,6 +17,8 @@ const { CANVAS_W, CANVAS_H, SEA_Y, HORIZON_Y } = CONSTANTS;
 const BATTLESHIP_SPRITE = 'assets/frames/battleship.png';
 // Battle-damaged variant, swapped in once the ship is critically wounded.
 const BATTLESHIP_DMG_SPRITE = 'assets/frames/battleship_damaged.png';
+// Air-Raid bomber — belly view, nose-down (bearing down on the player).
+const BOMBER_SPRITE = 'assets/frames/bomber.png';
 
 // ── Sprite geometry (must match the drawImage() call in draw()) ──────────────
 // battleship.png is 900×264, drawn drawW = 1.04·shipWidth wide with its waterline
@@ -655,9 +657,11 @@ class BomberBoss {
     this.d   = 1.0;      // starts at horizon
     this.alt = 0.80;
 
-    // Z-approach state: 0 = tiny speck at horizon, 1 = looming overhead
+    // Z-approach state: 0 = tiny speck at horizon, 1 = looming overhead.
+    // Slower now (spec) so the player gets a real window to shoot it down.
     this.approachZ     = 0;
-    this.approachSpeed = this.isFinal ? 0.06 : 0.045; // z-units/sec
+    this.approachSpeed = this.isFinal ? 0.040 : 0.028; // z-units/sec
+    this.overshoot     = 0;   // seconds past arrival (fly-over-and-exit phase)
 
     // Screen-space draw state (updated every frame in update())
     this.drawX     = CANVAS_W * 0.5;
@@ -730,29 +734,38 @@ class BomberBoss {
       return;
     }
 
-    // Z-approach: advance from horizon toward player
-    this.approachZ = Math.min(1.0, this.approachZ + this.approachSpeed * dt);
+    if (this.approachZ < 1.0) {
+      // Run-in: fly from the horizon toward the player, growing.
+      this.approachZ = Math.min(1.0, this.approachZ + this.approachSpeed * dt);
+      this.drawScale = lerp(0.04, 1.2, this.approachZ) * this.scale;
+      this.drawX     = CANVAS_W * 0.5;
+      this.drawY     = lerp(HORIZON_Y - 20, 80, this.approachZ);
+      this.d         = lerp(1.0, 0.04, this.approachZ);
+    } else {
+      // Fly-OVER: having reached the player it keeps going, passing directly
+      // overhead and off the TOP of the screen (it "escapes"). The bomb it
+      // already dropped only resolves into the loss once it has FULLY exited
+      // the top — that's the player's last window to shoot it down.
+      this.overshoot += dt;
+      this.drawX     = CANVAS_W * 0.5;
+      this.drawY     = 80 - this.overshoot * 155;                 // climbs off the top (slow = dramatic overhead pass)
+      this.drawScale = (1.2 + this.overshoot * 0.7) * this.scale;  // looms as it passes over
+      this.d         = 0.02;
+      const halfH = 64 * this.drawScale;
+      if (!this.nukeDropped && this.drawY < -halfH - 40) {
+        this.nukeDropped   = true;   // escaped after dropping its bomb
+        game.nukeDetonated = true;   // → loss
+      }
+    }
 
-    // Update canonical screen-space draw state
-    this.drawScale = lerp(0.04, 1.2, this.approachZ) * this.scale;
-    this.drawX     = CANVAS_W * 0.5;
-    this.drawY     = lerp(HORIZON_Y - 20, 80, this.approachZ);
-
-    // Sync world-d so SAM targeting & escorts get a sensible depth
-    this.d = lerp(1.0, 0.04, this.approachZ);
-
-    // Open bomb bay when close enough (approachZ >= 0.85)
-    if (!this.nukeDropped && !this.dead && this.approachZ >= 0.85 && !this.bombBayOpen) {
+    // Bomb bay opens on the run-in (visual bomb drop). This does NOT end the
+    // game any more — the loss only comes if the bomber survives to exit the
+    // top (above). Kill it first and the bomb is averted.
+    if (!this.dead && this.approachZ >= 0.85 && !this.bombBayOpen) {
       this.bombBayOpen = true;
       this.bombBayTimer = 0;
     }
-    if (this.bombBayOpen) {
-      this.bombBayTimer += dt;
-      if (this.bombBayTimer >= 2.0 && !this.nukeDropped) {
-        this.nukeDropped = true;
-        game.nukeDetonated = true;
-      }
-    }
+    if (this.bombBayOpen) this.bombBayTimer += dt;
 
     // Update escorts
     for (const esc of this.escorts) {
@@ -799,7 +812,14 @@ class BomberBoss {
     ctx.save();
     ctx.translate(cx, cy);
 
-    // ── FRONT-FACING SILHOUETTE (approaching from horizon) ────────────
+    // ── 3D bomber sprite (belly view, nose-down toward the player) ────────
+    const bomberImg = Sprites.get(BOMBER_SPRITE);
+    if (bomberImg) {
+      const drawW = 210 * S;
+      const drawH = drawW * (bomberImg.naturalHeight / bomberImg.naturalWidth);
+      ctx.drawImage(bomberImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+    // ── Vector fallback: FRONT-FACING SILHOUETTE ──────────────────────────
     // Fuselage: tall narrow ellipse (foreshortened front view)
     ctx.fillStyle = '#2a2a35';
     ctx.beginPath();
@@ -861,8 +881,9 @@ class BomberBoss {
     ctx.beginPath();
     ctx.ellipse(0, -13*S, 3*S, 4*S, 0, 0, Math.PI * 2);
     ctx.fill();
+    } // end vector fallback
 
-    // Bomb bay doors
+    // Bomb bay doors (overlay on sprite OR vector)
     if (this.bombBayOpen) {
       const openAmt = Math.min(1, this.bombBayTimer / 1.5);
       ctx.fillStyle = `rgba(10,10,10,${openAmt * 0.85})`;

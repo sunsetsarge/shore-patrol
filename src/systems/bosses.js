@@ -19,6 +19,7 @@ const BATTLESHIP_SPRITE = 'assets/frames/battleship.png';
 const BATTLESHIP_DMG_SPRITE = 'assets/frames/battleship_damaged.png';
 // Air-Raid bomber — belly view, nose-down (bearing down on the player).
 const BOMBER_SPRITE = 'assets/frames/bomber.png';
+const BOMBER_ESCORT_SPRITE = 'assets/frames/bomber_escort.png';
 
 // ── Sprite geometry (must match the drawImage() call in draw()) ──────────────
 // battleship.png is 900×264, drawn drawW = 1.04·shipWidth wide with its waterline
@@ -625,16 +626,21 @@ class FighterEscort {
               + Math.sin(this.orbitPhase * 1.3) * 15 * S + dip;
     const s   = 11 * S;
     ctx.save();
-    ctx.fillStyle = '#2a3040';
-    // Fuselage
-    ctx.beginPath(); ctx.ellipse(sx, sy, s*0.8, s*0.2, 0, 0, Math.PI*2); ctx.fill();
-    // Wings
-    ctx.beginPath();
-    ctx.moveTo(sx, sy); ctx.lineTo(sx - s*1.2, sy + s*0.5);
-    ctx.lineTo(sx - s*0.5, sy); ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(sx, sy); ctx.lineTo(sx + s*1.2, sy + s*0.5);
-    ctx.lineTo(sx + s*0.5, sy); ctx.closePath(); ctx.fill();
+    const escImg = Sprites.get(BOMBER_ESCORT_SPRITE);
+    if (escImg) {
+      const drawW = s * 4.2;
+      const drawH = drawW * (escImg.naturalHeight / escImg.naturalWidth);
+      ctx.drawImage(escImg, sx - drawW / 2, sy - drawH / 2, drawW, drawH);
+    } else {
+      ctx.fillStyle = '#2a3040';
+      ctx.beginPath(); ctx.ellipse(sx, sy, s*0.8, s*0.2, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(sx, sy); ctx.lineTo(sx - s*1.2, sy + s*0.5);
+      ctx.lineTo(sx - s*0.5, sy); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(sx, sy); ctx.lineTo(sx + s*1.2, sy + s*0.5);
+      ctx.lineTo(sx + s*0.5, sy); ctx.closePath(); ctx.fill();
+    }
     // HP bar (only when damaged)
     if (this.hp < this.maxHp) {
       const pct = clamp01(this.hp / this.maxHp);

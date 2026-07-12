@@ -94,6 +94,7 @@ function collectSpritePaths(data) {
   paths.add('assets/frames/battleship.png');          // battleship boss hull (bosses.js)
   paths.add('assets/frames/battleship_damaged.png');  // battle-damaged swap (bosses.js)
   paths.add('assets/frames/bomber.png');               // air-raid bomber (bosses.js)
+  paths.add('assets/frames/bomber_escort.png');        // fighter escort (bosses.js)
   for (const e of data.enemies.enemies) {
     addSpritePaths(paths, e.sprite);
     addSpritePaths(paths, e.deathSprite);

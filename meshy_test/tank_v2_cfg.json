@@ -1,0 +1,25 @@
+{
+ "out_dir": "C:/Claude/Projects/Active/Beachhead/meshy_test/renders_tank2",
+ "res": 900,
+ "units": [
+  {
+   "name": "tank2",
+   "glb": "C:/Claude/Projects/Active/Beachhead/meshy_test/tank_v2.glb",
+   "azimuth_deg": 270,
+   "elev_deg": 18,
+   "z_frac": 0.63,
+   "base_frames": 4,
+   "base_wobble": {
+    "pitch": 1.2,
+    "bob": 0.005
+   },
+   "part_rotations": [
+    -24,
+    -12,
+    0,
+    12,
+    24
+   ]
+  }
+ ]
+}

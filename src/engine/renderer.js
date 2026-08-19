@@ -303,6 +303,37 @@ export function entityMuzzlePoint(entity, sx, sy, scale) {
   return { x: sx + dx, y: centerY + dy };
 }
 
+// Ground contact shadow. Without this, composited 3D sprites read as "pasted on"
+// the painted background instead of standing on the beach. Generic + data-driven:
+// every entity gets one sized from its drawn width; `shadowScale` / `shadowAlpha`
+// in the def can tune it, and `noShadow: true` opts out. Air units cast their
+// shadow on the GROUND below them (sells altitude), shrinking with height.
+function drawContactShadow(ctx, entity, sx, sy, drawW, scale) {
+  const type = entity.type || {};
+  if (type.noShadow) return;
+  const domain = type.domain;
+  if (domain === 'sea') return;            // sea craft already get a foam wake
+  let cx = sx, cy = sy, k = 1, alpha = (type.shadowAlpha || 0.46);
+  if (domain === 'air') {
+    const alt = clamp01(entity.alt || 0);
+    const gp = project(entity.x, entity.d, 0, 'land');
+    cx = gp.sx; cy = gp.sy;
+    k = 0.62 - alt * 0.34;                 // higher up = smaller, fainter
+    alpha *= (1 - alt * 0.55);
+  }
+  const rx = drawW * 0.33 * (type.shadowScale || 1) * k;
+  const ry = Math.max(1.5, rx * 0.30);
+  if (rx <= 0.5 || alpha <= 0.02) return;
+  ctx.save();
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+  g.addColorStop(0,   `rgba(28,22,14,${alpha})`);
+  g.addColorStop(0.55, `rgba(28,22,14,${alpha * 0.62})`);
+  g.addColorStop(1,   'rgba(28,22,14,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
 export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
   const type = entity.type || {};
   const shape = type.shape;
@@ -410,6 +441,9 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
       const maxBank = 0.17;
       bank = Math.max(-maxBank, Math.min(maxBank, hx * type.bankFactor));
     }
+
+    // Ground contact shadow first, so the sprite sits on top of it.
+    drawContactShadow(ctx, entity, sx, sy, drawW, scale);
 
     ctx.save();
     ctx.translate(sx, centerY);

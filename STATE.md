@@ -1,4 +1,31 @@
-# STATE — Beachhead (browser game)
+Updated: 2026-08-19 (MESHY VISUAL UPGRADE PASS — DEPLOYED. Meshy balance 985 -> 701.
+DONE + LIVE:
+ 1. GROUND CONTACT SHADOWS (renderer.js drawContactShadow) — there were ZERO entity shadows in
+    the whole engine, which is why sprites read as pasted onto the painted background. Generic +
+    data-driven (shadowScale/shadowAlpha/noShadow); air units cast a ground shadow that shrinks
+    and fades with altitude. Biggest single grounding win.
+ 2. LCVP + LST replaced — they were flat UNTEXTURED GREY PRIMITIVE BOXES (worst assets in the
+    game; the LCVP is the first enemy a player ever sees). New Meshy textured craft installed at
+    az 278 / elev 24-26 so bows point at the player, shared union bbox across the 4 rock frames.
+ 3. TANK replaced — was plain flat green. New detailed Meshy tank (sloped armour, road wheels,
+    tracks, stowage) split hull/turret via split_render.py z_frac 0.63 (only the turret traverses)
+    at az 270 / elev 18 head-on; 4 hull frames + 5 turret aim angles, ONE shared bbox.
+ 4. BEACH SCENERY SYSTEM (NEW) — data/scenery.json + Renderer.drawSceneryProp, drawn inside the
+    existing depth-sorted pass so enemies pass in front of/behind props; each prop gets a contact
+    shadow. Seeded with Meshy Czech hedgehogs + bunkers. The beach was ~45% empty sand.
+
+MESHY RESULT QUALITY (7 models, honest): tank EXCELLENT, LST EXCELLENT, hedgehog EXCELLENT,
+LCVP GOOD-but-wrong-shape (a cabin launch, NOT a Higgins boat with a bow ramp — Meshy still
+refuses open-well craft, handoff Rule 4; took it anyway because textured > correct-but-flat at
+~85px), bunker MEDIOCRE (reads like a fireplace), barbed wire FAILED (bundle of sticks on a
+DIORAMA BASE — a Meshy tell for prop requests; not installed), wreck_craft still generating.
+
+STILL OPEN (confirmed by audit, not yet done): screenshake is SET in bosses.js:314 but never
+applied anywhere = dead feature; boss HP panel overlaps the SCORE HUD; enemies only reach
+12-17% of screen height (sea craft scale caps at 0.55); background.png is exactly 1280x720 so it
+softens on bigger displays. The 6-lens audit workflow (SHIP_PLAN.md) died twice on session exit
+and never produced its report.
+Prior: 2026-07-10 (SHIP-LOOP — W1/W2/W3/W4 ALL DONE + DEPLOYED (Fable-judged). Harness:
 
 Updated: 2026-07-10 (SHIP-LOOP — W1/W2/W3/W4 ALL DONE + DEPLOYED (Fable-judged). Harness:
 screenshot_sink.py :8200 + window.saveShot → shots/<name>.png → `model:"fable"` Agent judges.

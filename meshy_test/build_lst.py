@@ -25,11 +25,11 @@ def mat(name, rgb, rough=0.7, metal=0.2):
     b.inputs["Roughness"].default_value = rough; b.inputs["Metallic"].default_value = metal
     return m
 
-M_HULL = mat("hull", (0.30, 0.32, 0.30))    # navy gray-green
-M_DECK = mat("deck", (0.22, 0.23, 0.20))
-M_DARK = mat("dark", (0.14, 0.15, 0.13))
-M_RED  = mat("red",  (0.35, 0.14, 0.10), 0.8, 0.0)  # boot-topping / red hull below waterline
-M_RAMP = mat("ramp", (0.26, 0.27, 0.24), 0.5, 0.4)
+M_HULL = mat("hull", (0.125, 0.140, 0.132), 0.80)    # navy gray-green
+M_DECK = mat("deck", (0.095, 0.100, 0.085), 0.86)
+M_DARK = mat("dark", (0.042, 0.046, 0.040), 0.88)
+M_RED  = mat("red",  (0.175, 0.055, 0.038), 0.85, 0.0)  # boot-topping / red hull below waterline
+M_RAMP = mat("ramp", (0.115, 0.122, 0.108), 0.50, 0.55)
 
 objs = []
 def box(name, sx, sy, sz, loc, m, rot=None):
@@ -64,8 +64,15 @@ for tx in (-0.4, 0.5):
 def sun(name, rot, e):
     d = bpy.data.lights.new(name, 'SUN'); d.energy = e
     o = bpy.data.objects.new(name, d); bpy.context.collection.objects.link(o); o.rotation_euler = rot
-sun("key", (math.radians(52), 0, math.radians(-28)), 3.4)
-sun("fill", (math.radians(60), 0, math.radians(140)), 1.1)
+sun("key", (math.radians(52), 0, math.radians(-32)), 2.1)
+sun("fill", (math.radians(62), 0, math.radians(140)), 0.55)
+sun("rim", (math.radians(-18), 0, math.radians(75)), 0.85)
+# Ambient sky fill — without this the flat primitive faces blow out to a
+# featureless light grey (the "untextured grey box" look).
+_w = bpy.data.worlds.new("w"); sc.world = _w; _w.use_nodes = True
+_bgn = _w.node_tree.nodes["Background"]
+_bgn.inputs[0].default_value = (0.42, 0.50, 0.62, 1.0)
+_bgn.inputs[1].default_value = 0.42
 
 cam_d = bpy.data.cameras.new("cam"); cam_d.lens = 50
 cam = bpy.data.objects.new("cam", cam_d); bpy.context.collection.objects.link(cam); sc.camera = cam

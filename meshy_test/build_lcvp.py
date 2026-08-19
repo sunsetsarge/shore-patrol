@@ -28,11 +28,11 @@ def mat(name, rgb, rough=0.7, metal=0.0):
     b.inputs["Metallic"].default_value = metal
     return m
 
-M_HULL = mat("hull", (0.28, 0.30, 0.22))       # gray-green plywood
-M_DARK = mat("dark", (0.16, 0.17, 0.13))
-M_RAMP = mat("ramp", (0.32, 0.33, 0.28), 0.6, 0.3)  # steel ramp
-M_HELM = mat("helm", (0.22, 0.26, 0.16))
-M_SKIN = mat("skin", (0.75, 0.55, 0.42))
+M_HULL = mat("hull", (0.115, 0.130, 0.083), 0.82)       # gray-green plywood
+M_DARK = mat("dark", (0.045, 0.050, 0.038), 0.88)
+M_RAMP = mat("ramp", (0.135, 0.140, 0.120), 0.52, 0.55)  # steel ramp
+M_HELM = mat("helm", (0.088, 0.105, 0.062), 0.85)
+M_SKIN = mat("skin", (0.52, 0.35, 0.25), 0.75)
 
 objs = []
 def box(name, sx, sy, sz, loc, material, rot=None):
@@ -93,8 +93,15 @@ def sun(name, rot, e):
     d = bpy.data.lights.new(name, 'SUN'); d.energy = e
     o = bpy.data.objects.new(name, d); bpy.context.collection.objects.link(o)
     o.rotation_euler = rot
-sun("key", (math.radians(50), 0, math.radians(-30)), 3.5)
-sun("fill", (math.radians(60), 0, math.radians(140)), 1.2)
+sun("key", (math.radians(52), 0, math.radians(-32)), 2.1)
+sun("fill", (math.radians(62), 0, math.radians(140)), 0.55)
+sun("rim", (math.radians(-18), 0, math.radians(75)), 0.85)
+# Ambient sky fill — without this the flat primitive faces blow out to a
+# featureless light grey (the "untextured grey box" look).
+_w = bpy.data.worlds.new("w"); sc.world = _w; _w.use_nodes = True
+_bgn = _w.node_tree.nodes["Background"]
+_bgn.inputs[0].default_value = (0.42, 0.50, 0.62, 1.0)
+_bgn.inputs[1].default_value = 0.42
 
 cam_d = bpy.data.cameras.new("cam"); cam_d.lens = 50
 cam = bpy.data.objects.new("cam", cam_d); bpy.context.collection.objects.link(cam)

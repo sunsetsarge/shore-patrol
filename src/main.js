@@ -20,6 +20,7 @@ const DATA_FILES = {
   enemies: 'data/enemies.json',
   waves: 'data/waves.json',
   crates: 'data/crates.json',
+  scenery: 'data/scenery.json',
 };
 
 // Display name. "Beach Head" is a live trademark (Access Software 1983 /
@@ -107,6 +108,10 @@ function collectSpritePaths(data) {
   }
   for (const w of data.weapons.weapons) {
     addSpritePaths(paths, w.turretSprite);
+  }
+  // Static beach scenery (obstacles/defences) — pure data, no id literals.
+  if (data.scenery && data.scenery.props) {
+    for (const pr of data.scenery.props) addSpritePaths(paths, pr.sprite);
   }
   return [...paths];
 }
@@ -316,7 +321,8 @@ function renderPlaying(ctx, game) {
   Bosses.draw(ctx, game);
 
   // draw entities sorted far-to-near (by d desc) so nearer overlaps farther
-  const drawList = [...game.entities, ...game.crates];
+  const sceneryProps = (game.data.scenery && game.data.scenery.props) || [];
+  const drawList = [...game.entities, ...game.crates, ...sceneryProps];
   drawList.sort((a, b) => {
     const da = a.kind === 'crate' ? (1 - a.alt) : a.d;
     const db = b.kind === 'crate' ? (1 - b.alt) : b.d;
@@ -337,6 +343,10 @@ function renderPlaying(ctx, game) {
     if (e.kind === 'crate') {
       const { sx, sy, scale } = Renderer.project(e.x, 0, e.alt, 'air');
       Renderer.drawCrate(ctx, sx, sy, scale, e.type.color, e.type, e.age);
+    } else if (!e.type) {
+      // static scenery prop (data/scenery.json) — no `type`, just sprite/x/d/scale
+      const { sx, sy, scale } = Renderer.project(e.x, e.d, 0, 'land');
+      Renderer.drawSceneryProp(ctx, e, sx, sy, scale);
     } else {
       const domain = e.type.domain;
       const { sx, sy, scale } = Renderer.project(e.x, e.d, e.alt, domain);

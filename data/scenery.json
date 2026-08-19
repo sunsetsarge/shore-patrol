@@ -1,0 +1,12 @@
+{
+  "props": [
+    { "sprite": "assets/scenery/obst_hedgehog.png", "x": -0.72, "d": 0.34, "scale": 0.62 },
+    { "sprite": "assets/scenery/obst_hedgehog.png", "x": -0.44, "d": 0.22, "scale": 0.70 },
+    { "sprite": "assets/scenery/obst_hedgehog.png", "x":  0.05, "d": 0.40, "scale": 0.55 },
+    { "sprite": "assets/scenery/obst_hedgehog.png", "x":  0.51, "d": 0.27, "scale": 0.66 },
+    { "sprite": "assets/scenery/obst_hedgehog.png", "x":  0.83, "d": 0.45, "scale": 0.52 },
+    { "sprite": "assets/scenery/obst_hedgehog.png", "x": -0.20, "d": 0.55, "scale": 0.46 },
+    { "sprite": "assets/scenery/obst_bunker.png",   "x": -0.90, "d": 0.12, "scale": 0.78 },
+    { "sprite": "assets/scenery/obst_bunker.png",   "x":  0.95, "d": 0.18, "scale": 0.70 }
+  ]
+}

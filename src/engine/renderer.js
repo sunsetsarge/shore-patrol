@@ -334,6 +334,29 @@ function drawContactShadow(ctx, entity, sx, sy, drawW, scale) {
   ctx.restore();
 }
 
+// Static beach scenery (obstacles, defences, wreckage). Pure data — every prop
+// comes from data/scenery.json, so nothing here branches on a content id.
+// Bottom-anchored like a land entity and drawn inside the same depth-sorted
+// pass, so advancing enemies correctly pass in front of / behind it.
+const SCENERY_BASE_H = 120;
+export function drawSceneryProp(ctx, prop, sx, sy, scale) {
+  const img = prop.sprite ? Sprites.get(prop.sprite) : null;
+  if (!img) return;
+  const drawH = SCENERY_BASE_H * scale * (prop.scale || 1);
+  const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+  // contact shadow so props sit on the sand rather than float on it
+  const rx = drawW * 0.34, ry = Math.max(1.5, rx * 0.30);
+  ctx.save();
+  const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, rx);
+  g.addColorStop(0, 'rgba(28,22,14,0.46)');
+  g.addColorStop(0.55, 'rgba(28,22,14,0.28)');
+  g.addColorStop(1, 'rgba(28,22,14,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  ctx.drawImage(img, sx - drawW / 2, sy - drawH, drawW, drawH);
+}
+
 export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
   const type = entity.type || {};
   const shape = type.shape;

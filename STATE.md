@@ -1,4 +1,30 @@
-Updated: 2026-08-19 (MESHY VISUAL UPGRADE PASS — DEPLOYED. Meshy balance 985 -> 701.
+Updated: 2026-08-21 (COUNCIL DEPTH+FEEL PASS DEPLOYED @9b8dc4c. The council run
+(shore-patrol-pipeline-market-audit-20260821-083443, 16 tasks, 56 agents, 5.18M tokens) blocked its own
+deploy on two defects; both are now fixed, re-verified by OTHER models, and live.
+FIX 1 - sea craft floated above the waterline: the anchor was a hand-tuned ramp calibrated against the OLD
+0.55 sea-scale cap, so raising it to 0.9 scaled every offset with drawH and put the waterline at DECK
+level. Now a submersion fraction (0.24-0.30) derived from the water surface + a waterline CLIP so the
+below-water hull is OCCLUDED rather than drawn over the sea. Verified by pixel measurement: ZERO hull px
+below the waterline on both open-water craft. DO NOT revert to a hand-tuned anchor ramp.
+FIX 2 - screen shake was wired but ~0.48px (imperceptible). Weapon constants ~7x, boss heavy shell
+0.04->0.45, and a NEW producer for boss section destruction (0.75) which previously emitted nothing.
+Measured: MG 1.5px / boss shell 5.4px / section kill 9.0px.
+PROCESS LESSON (important): multi-model judging split 2-1 BOTH times and the majority was wrong once. Fable
+alone caught that the full V-keel was still drawn over the sea; acting on the dissent rather than the tally
+is what produced the real fix. The second round split the other way (sonnet FAIL) and was settled by direct
+PIXEL MEASUREMENT, not a vote. Resolve model disagreement with a measurement.
+ANSWERED from the council's PR questions: grep contract is a CEILING (11 now vs 24 baseline - do NOT
+'restore padding comments'); perf regression is irrelevant (0.85ms/frame, 19.6x headroom at 60fps).
+window.saveShot() is now PERSISTED in index.html - the screenshot gate no longer needs hand-injection.
+STILL OPEN: dpr sharpening unvalidated on a real display (this browser reports dpr 0.667 so the formula is
+a no-op here); flat SEA_Y band vs the SLOPED painted waterline still mismatches near the left shore
+(pre-existing, larger change); '.50 MG' ammo label washes out on sand; council contract-verifier flagged
+task 4 filing a FALSE filesTouched self-report (1 claimed, 17 actual) - tighten worker allowlists.
+AUDIT: ~/Documents/council-docs/shore-patrol-pipeline-market-audit-20260821-083443/AUDIT.md - confirms NO
+game titled 'Beach Head 3000' exists (lineage 1983/2000/2002/Desert War 2004) and that Blaine's four
+'feels thin' complaints map 1:1 onto real player complaints in this genre.
+NEXT: Blaine playtests and audio-records feedback; transcribe via the Audacity MCP and act on it.
+Prior: 2026-08-19 (MESHY VISUAL UPGRADE PASS — DEPLOYED. Meshy balance 985 -> 701.
 DONE + LIVE:
  1. GROUND CONTACT SHADOWS (renderer.js drawContactShadow) — there were ZERO entity shadows in
     the whole engine, which is why sprites read as pasted onto the painted background. Generic +

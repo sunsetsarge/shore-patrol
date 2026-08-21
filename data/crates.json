@@ -31,9 +31,27 @@
       "id": "upgrade_crate",
       "weaponId": "mg",
       "amount": 0,
-      "dropSpeed": 0.040,
+      "dropSpeed": 0.04,
       "spawnWeight": 1,
       "color": "#ff9933",
+      "sprite": "assets/crate_upgrade.png"
+    },
+    {
+      "id": "repair_crate",
+      "upgradeType": "repair",
+      "amount": 25,
+      "dropSpeed": 0.045,
+      "spawnWeight": 2,
+      "color": "#44dd66",
+      "sprite": "assets/crate_upgrade.png"
+    },
+    {
+      "id": "rapidfire_crate",
+      "upgradeType": "rapidFire",
+      "amount": 10,
+      "dropSpeed": 0.05,
+      "spawnWeight": 2,
+      "color": "#44ccff",
       "sprite": "assets/crate_upgrade.png"
     }
   ]

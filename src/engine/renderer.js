@@ -48,7 +48,7 @@ const HORIZON_Y = 260;
 const SEA_Y = 420;
 const BEACH_Y = 640;
 
-function lerp(a, b, t) {
+export function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
@@ -64,7 +64,7 @@ export function project(x, d, alt = 0, domain = 'land') {
     sy = lerp(320, 80, clamp01(alt)) - d * 120;
     sy = Math.max(40, sy);
   } else if (domain === 'sea') {
-    scale = lerp(0.55, 0.18, d01);
+    scale = lerp(0.9, 0.18, d01);
     sy = lerp(SEA_Y, HORIZON_Y, d01);
   } else {
     scale = lerp(1.0, 0.18, d01);
@@ -74,7 +74,7 @@ export function project(x, d, alt = 0, domain = 'land') {
   return { sx, sy, scale };
 }
 
-function clamp01(v) {
+export function clamp01(v) {
   return Math.max(0, Math.min(1, v));
 }
 
@@ -410,6 +410,7 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
     const drawW = drawH * (img.naturalWidth / img.naturalHeight);
 
     let top;
+    let waterClipY = null; // sea craft: y of the water surface to clip the hull at
     if (domain === 'air') {
       // center-anchored at (sx, sy)
       top = drawSy - drawH / 2;
@@ -422,13 +423,33 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
       // hull straddling the waterline with bow grounding on the beach.
       // Formula: lerp(-0.2, 0.55, 1-d01) → -0.2 when far, 0.55 when near.
       const d01sea = clamp01(entity.d || 0);
-      const seaAnchor = lerp(-0.2, 0.55, 1 - d01sea);
-      top = drawSy - drawH * seaAnchor;
+      // Sea craft sit ON the water: the sprite's hull bottom lands just BELOW the
+      // craft's own projected water surface (sy), submerged by a small fraction
+      // of its drawn height. Expressed as a SUBMERSION FRACTION rather than a
+      // hand-tuned anchor ramp, because the old ramp was calibrated against the
+      // 0.55 sea-scale cap - when that cap was raised to 0.9 every offset scaled
+      // with drawH, which put the waterline up at deck level and left the whole
+      // hull hanging in the air. Deriving from submersion keeps this correct for
+      // any future scale change.
+      // Submersion is deliberately DEEP: the Meshy craft sprites include the
+      // full below-waterline V-hull down to the keel. A shallow value moved the
+      // boat down but still drew the whole underwater hull over the sea, which
+      // reads as a boat perched on the surface rather than floating in it.
+      // Paired with the waterline CLIP below, this hides the keel so the water
+      // visually cuts across the hull the way it does on a real vessel.
+      const submersion = lerp(0.30, 0.24, 1 - d01sea); // far -> near
+      top = drawSy - drawH * (1 - submersion);
+      // Everything below the craft's own water surface is underwater and must
+      // be occluded, not painted on top of the sea. Beached craft are sitting
+      // on sand, so they are never clipped.
+      if (!(entity.flags && (entity.flags.beached || entity.flags.rampDown))) {
+        waterClipY = sy;
+      }
       // Foam wake at the hull's waterline so approaching craft read as
       // sitting IN the water rather than floating (bow-on hulls have no
       // visible water contact without it). Skip once beached.
       if (!(entity.flags && (entity.flags.beached || entity.flags.rampDown))) {
-        const wlY = top + drawH * lerp(0.82, 0.95, 1 - d01sea);
+        const wlY = sy; // the true water surface for this depth (unbobbed)
         ctx.save();
         ctx.globalAlpha = 0.4;
         ctx.fillStyle = '#e8f4f0';
@@ -469,6 +490,12 @@ export function drawEntityGlyph(ctx, entity, sx, sy, scale) {
     drawContactShadow(ctx, entity, sx, sy, drawW, scale);
 
     ctx.save();
+    if (waterClipY !== null) {
+      // Clip to everything ABOVE the waterline before drawing the hull.
+      ctx.beginPath();
+      ctx.rect(0, 0, CANVAS_W, waterClipY);
+      ctx.clip();
+    }
     ctx.translate(sx, centerY);
     if (bank) ctx.rotate(bank);
     if (mirror) ctx.scale(-1, 1);
@@ -633,6 +660,7 @@ const RACK_RECOIL_PX = 6; // active sprite recoils down/back this many px at rec
 export const RACK_NEAR_Y = RACK_BASELINE_Y - RACK_RISE_PX - RACK_DRAW_H * 1.25;
 
 function drawVectorBarrel(ctx, turret) {
+  if (!turret || turret.barrelAngle === undefined) return;
   const originX = 640;
   const originY = 700;
   const barrelLen = 90;
@@ -715,10 +743,12 @@ export function drawTurret(ctx, turret) {
 }
 
 function recoilT01(turret) {
-  return Math.max(0, Math.min(1, (turret.recoilTimer || 0) / 0.12));
+  if (!turret) return 0;
+  return clamp01((turret.recoilTimer || 0) / 0.12);
 }
 
 export function drawMuzzleFlash(ctx, turret, alpha) {
+  if (!turret || turret.barrelAngle === undefined) return;
   const originX = 640;
   const originY = 700;
   let angle = turret.barrelAngle;

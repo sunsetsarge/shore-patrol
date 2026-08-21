@@ -12,6 +12,7 @@ import * as ScoreSystem from './systems/scoreSystem.js';
 import * as HUD from './systems/hud.js';
 import * as Bosses from './systems/bosses.js';
 import * as UpgradeSystem from './systems/upgradeSystem.js';
+import * as CameraShake from './systems/cameraShake.js';
 import { movementBehaviors } from './systems/movementBehaviors.js';
 import { fireModeHandlers } from './systems/weaponSystem.js';
 
@@ -21,12 +22,16 @@ const DATA_FILES = {
   waves: 'data/waves.json',
   crates: 'data/crates.json',
   scenery: 'data/scenery.json',
+  upgrades: 'data/upgrades.json',
 };
 
 // Display name. "Beach Head" is a live trademark (Access Software 1983 /
 // Digital Fusion's "Beach Head 2000") — the mechanics are free to clone, the
 // name is not. Change this ONE constant to rename the game everywhere it shows.
 const GAME_TITLE = 'SHORE PATROL';
+
+// Debug-panel spawn depth per enemy `domain` (data field, not an enemy id).
+const DEBUG_SPAWN_Y = { land: 0.7, air: 0.5, sea: 1.0 };
 
 const FIXED_DT = 1 / 60;
 const MAX_ACCUMULATED = 0.25;
@@ -51,24 +56,36 @@ function validateData(data) {
   // just pass objects through. Skip entries with unknown movement/fireMode
   // ids rather than crash — filter here so downstream systems see only valid data.
   const validEnemies = [];
-  for (const e of data.enemies.enemies) {
-    if (!movementBehaviors[e.movement]) {
-      console.error(`main: unknown movement id "${e.movement}" on enemy "${e.id}" — skipping entry`);
+  for (const enemy of data.enemies.enemies) {
+    if (!movementBehaviors[enemy.movement]) {
+      console.error(`main: unknown movement id "${enemy.movement}" on enemy "${enemy.id}" — skipping entry`);
       continue;
     }
-    validEnemies.push(e);
+    validEnemies.push(enemy);
   }
   data.enemies.enemies = validEnemies;
 
   const validWeapons = [];
-  for (const w of data.weapons.weapons) {
-    if (!fireModeHandlers[w.fireMode]) {
-      console.error(`main: unknown fireMode id "${w.fireMode}" on weapon "${w.id}" — skipping entry`);
+  for (const weapon of data.weapons.weapons) {
+    if (!fireModeHandlers[weapon.fireMode]) {
+      console.error(`main: unknown fireMode id "${weapon.fireMode}" on weapon "${weapon.id}" — skipping entry`);
       continue;
     }
-    validWeapons.push(w);
+    validWeapons.push(weapon);
   }
   data.weapons.weapons = validWeapons;
+
+  // Upgrades are a hard dependency: a missing/malformed data/upgrades.json must
+  // fail loudly here rather than leaving the panel silently empty.
+  const categories = data.upgrades && data.upgrades.categories;
+  if (!Array.isArray(categories) || categories.length === 0) {
+    throw new Error('main: data/upgrades.json must define a non-empty "categories" array');
+  }
+  for (const category of categories) {
+    if (!category.key || !Array.isArray(category.tiers) || category.tiers.length === 0) {
+      throw new Error(`main: upgrade category "${category.key}" must have a key and a non-empty tiers array`);
+    }
+  }
 
   return data;
 }
@@ -81,8 +98,8 @@ function validateData(data) {
 function addSpritePaths(paths, sprite) {
   if (!sprite) return;
   if (Array.isArray(sprite)) {
-    for (const p of sprite) {
-      if (p) paths.add(p);
+    for (const spritePath of sprite) {
+      if (spritePath) paths.add(spritePath);
     }
   } else {
     paths.add(sprite);
@@ -96,22 +113,22 @@ function collectSpritePaths(data) {
   paths.add('assets/frames/battleship_damaged.png');  // battle-damaged swap (bosses.js)
   paths.add('assets/frames/bomber.png');               // air-raid bomber (bosses.js)
   paths.add('assets/frames/bomber_escort.png');        // fighter escort (bosses.js)
-  for (const e of data.enemies.enemies) {
-    addSpritePaths(paths, e.sprite);
-    addSpritePaths(paths, e.deathSprite);
-    addSpritePaths(paths, e.partSprite);
-    addSpritePaths(paths, e.fireSprite);
-    addSpritePaths(paths, e.beachedSprite);
+  for (const enemy of data.enemies.enemies) {
+    addSpritePaths(paths, enemy.sprite);
+    addSpritePaths(paths, enemy.deathSprite);
+    addSpritePaths(paths, enemy.partSprite);
+    addSpritePaths(paths, enemy.fireSprite);
+    addSpritePaths(paths, enemy.beachedSprite);
   }
-  for (const c of data.crates.crates) {
-    addSpritePaths(paths, c.sprite);
+  for (const crate of data.crates.crates) {
+    addSpritePaths(paths, crate.sprite);
   }
-  for (const w of data.weapons.weapons) {
-    addSpritePaths(paths, w.turretSprite);
+  for (const weapon of data.weapons.weapons) {
+    addSpritePaths(paths, weapon.turretSprite);
   }
   // Static beach scenery (obstacles/defences) — pure data, no id literals.
   if (data.scenery && data.scenery.props) {
-    for (const pr of data.scenery.props) addSpritePaths(paths, pr.sprite);
+    for (const prop of data.scenery.props) addSpritePaths(paths, prop.sprite);
   }
   return [...paths];
 }
@@ -141,6 +158,9 @@ function createGame(canvas, ctx, data, audio) {
     // Boss state (reset each game)
     bosses: [],
     nukeDetonated: false,
+    // Shared screen-shake accumulator. Producers add to it; systems/cameraShake.js
+    // is the only consumer (decays it in update, applies it in render).
+    screenShake: 0,
   };
   return game;
 }
@@ -155,8 +175,8 @@ function makeCloud(x) {
     h: 25 + Math.random() * 35,
     speed: 8 + Math.random() * 12,
     alpha: 0.6 + Math.random() * 0.35,
-    puffs: Array.from({ length: 3 + Math.floor(Math.random() * 3) }, (_, i) => ({
-      dx: (i - 1.5) * 28,
+    puffs: Array.from({ length: 3 + Math.floor(Math.random() * 3) }, (_, puffIndex) => ({
+      dx: (puffIndex - 1.5) * 28,
       dy: Math.random() * 12 - 6,
       r: 18 + Math.random() * 18,
     })),
@@ -169,7 +189,7 @@ const CANVAS_W_MAIN = 1280;
 
 function initClouds(game) {
   game.clouds = [];
-  for (let i = 0; i < 6; i++) {
+  for (let cloudIndex = 0; cloudIndex < 6; cloudIndex++) {
     game.clouds.push(makeCloud(Math.random() * CANVAS_W_MAIN));
   }
 }
@@ -179,34 +199,34 @@ function updateAmbience(game, dt) {
   game.whitecapTimer -= dt;
   if (game.whitecapTimer <= 0) {
     game.whitecapTimer = 0.3 + Math.random() * 0.7;
-    const wx = Math.random() * CANVAS_W_MAIN;
+    const whitecapX = Math.random() * CANVAS_W_MAIN;
     // The painted waterline is a sloped trapezoid (high-left y≈345 → low-right
     // y≈440), so cap each whitecap's near edge at the local water depth instead
     // of a flat SEA_Y — otherwise left-side foam spawns on the sand.
-    const waterY = 345 + 95 * (wx / CANVAS_W_MAIN);
-    const wy = HORIZON_Y + Math.random() * (waterY - HORIZON_Y);
-    const t = (wy - HORIZON_Y) / (waterY - HORIZON_Y);
+    const waterY = 345 + 95 * (whitecapX / CANVAS_W_MAIN);
+    const whitecapY = HORIZON_Y + Math.random() * (waterY - HORIZON_Y);
+    const depthRatio = (whitecapY - HORIZON_Y) / (waterY - HORIZON_Y);
     const maxLife = 0.8 + Math.random() * 1.2;
     game.whitecaps.push({
-      x: wx, y: wy,
-      w: (15 + Math.random() * 25) * (0.3 + t * 0.7),
-      h: (3 + Math.random() * 4) * (0.3 + t * 0.7),
+      x: whitecapX, y: whitecapY,
+      w: (15 + Math.random() * 25) * (0.3 + depthRatio * 0.7),
+      h: (3 + Math.random() * 4) * (0.3 + depthRatio * 0.7),
       life: maxLife, maxLife,
       vx: -20 - Math.random() * 15,
     });
   }
-  for (let i = game.whitecaps.length - 1; i >= 0; i--) {
-    const w = game.whitecaps[i];
-    w.x += w.vx * dt;
-    w.life -= dt;
-    if (w.life <= 0) game.whitecaps.splice(i, 1);
+  for (let whitecapIndex = game.whitecaps.length - 1; whitecapIndex >= 0; whitecapIndex--) {
+    const whitecap = game.whitecaps[whitecapIndex];
+    whitecap.x += whitecap.vx * dt;
+    whitecap.life -= dt;
+    if (whitecap.life <= 0) game.whitecaps.splice(whitecapIndex, 1);
   }
 
   // Clouds
-  for (const c of game.clouds) {
-    c.x -= c.speed * dt;
-    if (c.x + c.w < 0) {
-      Object.assign(c, makeCloud(CANVAS_W_MAIN + 100));
+  for (const cloud of game.clouds) {
+    cloud.x -= cloud.speed * dt;
+    if (cloud.x + cloud.w < 0) {
+      Object.assign(cloud, makeCloud(CANVAS_W_MAIN + 100));
     }
   }
 
@@ -221,7 +241,7 @@ function initSystems(game, data) {
   CrateSystem.init(game, data);
   WaveDirector.init(game, data);
   Bosses.init(game, data);   // registers bossHitCallback / bossSplashCallback / bossAirTargetCallback
-  UpgradeSystem.init(game);  // weapon tiers + upgrade panel state
+  UpgradeSystem.init(game, data);  // weapon tiers + upgrade panel state (data-driven)
   game.defense = 100;
   game.nukeDetonated = false;
   game.gameoverAge = 0;
@@ -238,6 +258,8 @@ function resetGame(game, data) {
 }
 
 function update(game, dt) {
+  // Runs in every state so leftover shake keeps settling while paused/game over.
+  CameraShake.update(game, dt);
   if (game.state !== 'playing') return;
   game.time += dt;
   if (game.godMode) game.defense = 100; // debug: full defense always
@@ -656,17 +678,28 @@ function renderVictory(ctx, game) {
 
 function render(game) {
   const ctx = game.ctx;
+  // The backing store is 1280*dpr x 720*dpr (see index.html initBackingStore).
+  // This transform makes every draw call below use logical 1280x720 pixels,
+  // so no drawing coordinate anywhere else changes. Camera shake nests inside.
+  const dpr = window.__DPR__ || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, 1280, 720);
   if (game.state === 'menu') {
     renderMenu(ctx, game);
-  } else if (game.state === 'playing') {
-    renderPlaying(ctx, game);
-  } else if (game.state === 'paused') {
-    renderPaused(ctx, game);
-  } else if (game.state === 'gameover') {
-    renderGameover(ctx, game);
-  } else if (game.state === 'victory') {
-    renderVictory(ctx, game);
+  } else {
+    // Everything but the menu shakes as one frame. apply()/restore() is a
+    // balanced pair, so an outer transform can nest safely around it.
+    CameraShake.apply(ctx, game);
+    if (game.state === 'playing') {
+      renderPlaying(ctx, game);
+    } else if (game.state === 'paused') {
+      renderPaused(ctx, game);
+    } else if (game.state === 'gameover') {
+      renderGameover(ctx, game);
+    } else if (game.state === 'victory') {
+      renderVictory(ctx, game);
+    }
+    CameraShake.restore(ctx);
   }
 }
 
@@ -700,27 +733,20 @@ async function main() {
 
   // Debug API — accessed by index.html debug panel via window.game.debug
   game.debug = {
-    spawnInfantry: () => {
+    // Generic, data-derived spawner: game.debug.spawn('<enemy id>', count?).
+    // Aliases (spawn<Id> / spawn<Shape>) are generated below from the loaded
+    // enemy definitions, so no enemy id is written as a literal here.
+    spawn: (id, count) => {
       if (game.state !== 'playing') return;
-      for (let i = 0; i < 4; i++) {
-        SpawnSystem.spawnEnemy(game, 'infantry', (Math.random() - 0.5) * 1.6, 0.7,
-          game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 });
+      const def = data.enemies.enemies.find(e => e.id === id);
+      if (!def) { console.warn(`debug.spawn: unknown enemy id "${id}"`); return; }
+      const diff = game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 };
+      const y      = DEBUG_SPAWN_Y[def.domain] !== undefined ? DEBUG_SPAWN_Y[def.domain] : 0.7;
+      const spread = def.shape === 'biped' ? 1.6 : 1.2;
+      const n      = count || (def.shape === 'biped' ? 4 : 1);
+      for (let i = 0; i < n; i++) {
+        SpawnSystem.spawnEnemy(game, def.id, (Math.random() - 0.5) * spread, y, diff);
       }
-    },
-    spawnTank: () => {
-      if (game.state !== 'playing') return;
-      SpawnSystem.spawnEnemy(game, 'tank', (Math.random() - 0.5) * 1.2, 0.6,
-        game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 });
-    },
-    spawnHeli: () => {
-      if (game.state !== 'playing') return;
-      SpawnSystem.spawnEnemy(game, 'helicopter', (Math.random() - 0.5) * 1.2, 0.5,
-        game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 });
-    },
-    spawnBoat: () => {
-      if (game.state !== 'playing') return;
-      SpawnSystem.spawnEnemy(game, 'landing_craft', (Math.random() - 0.5) * 1.2, 1.0,
-        game.waveState ? game.waveState.difficulty : { hp: 1, speed: 1 });
     },
     spawnAmmo: () => {
       if (game.state !== 'playing') return;
@@ -751,6 +777,22 @@ async function main() {
       Bosses.spawnBoss(game, 'bomber', 7);
     },
   };
+
+  // Generate spawn<Name> aliases from the loaded enemy definitions so the
+  // existing debug panel buttons in index.html keep working without any enemy
+  // id being spelled out in source. Both the enemy `id` and its `shape` field
+  // yield an alias; the first definition to claim a name wins.
+  {
+    const cap = str => str.replace(/(?:^|_)([a-z])/g, (_, ch) => ch.toUpperCase());
+    for (const def of data.enemies.enemies) {
+      for (const token of [def.id, def.shape]) {
+        if (!token) continue;
+        const name = 'spawn' + cap(token);
+        if (game.debug[name]) continue;
+        game.debug[name] = () => game.debug.spawn(def.id);
+      }
+    }
+  }
 
   attachInput(canvas, game.input, () => audio.ensureStarted());
 
@@ -849,9 +891,6 @@ async function main() {
       handleEndScreenInput();
       // still tick turret aim for reticle visuals on menu/gameover/victory
       Turret.updateAim(game.turret || Turret.createTurret(data.weapons.weapons), game.input.mouseX, game.input.mouseY);
-      if (!game.turret) {
-        // lazily create a turret just for menu reticle rendering
-      }
     }
 
     render(game);

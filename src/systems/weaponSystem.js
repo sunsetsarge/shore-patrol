@@ -1,12 +1,18 @@
 // Reads weapons.json-derived defs. fireModeHandlers registry dispatches on
 // the `fireMode` schema field — no weapon id branching anywhere in this file.
-import { project, unprojectD, unprojectX, resolveSpritePath, CONSTANTS } from '../engine/renderer.js';
+import { project, unprojectD, unprojectX, resolveSpritePath, clamp01, CONSTANTS } from '../engine/renderer.js';
 import { screenDistance, withinSplash } from '../engine/collision.js';
 import * as Turret from '../engine/turret.js';
 import * as Sprites from '../engine/sprites.js';
 
 let weaponDefs = [];
 
+/**
+ * Initialize the weapon system with loaded weapon definitions.
+ * @param {Object} game - Game state object to initialize
+ * @param {Object} data - Loaded game data containing weapons definitions
+ * @returns {void}
+ */
 export function init(game, data) {
   weaponDefs = data.weapons.weapons;
   game.turret = Turret.createTurret(weaponDefs);
@@ -39,7 +45,7 @@ function pointHitsSprite(px, py, sx, sy, scale, hitbox, spriteScale, domain, img
     // Match renderer.js sea anchor: lerp(-0.2, 0.55, 1 - d01sea)
     // At d=0 (shore): seaAnchor=0.55  → sprite straddles waterline correctly
     // At d=1 (horizon): seaAnchor=-0.2 → sprite drawn below sy, hull in water
-    const d01sea = Math.max(0, Math.min(1, entityD || 0));
+    const d01sea = clamp01(entityD || 0);
     const seaAnchor = -0.2 + 0.75 * (1 - d01sea);
     top    = sy - drawH * seaAnchor;
     bottom = top + drawH;
@@ -199,6 +205,84 @@ function spawnImpactSplash(game, screenX, screenY) {
   });
 }
 
+// --- Impact feedback (hit vs miss) -----------------------------------------
+// Cue ids come from the weapon's schema fields, never from a weapon id
+// literal: `impactSound` for a confirmed hit, `missSound` for a whiff. Both
+// are optional; the fallbacks are generic role names.
+const DEFAULT_IMPACT_SOUND = 'impactMetal';
+const DEFAULT_MISS_SOUND = 'impactMiss';
+
+// Per-shot screen-shake contribution, scaled from weapon damage and hard
+// capped so a 10/s automatic weapon cannot saturate the accumulator.
+const SHAKE_PER_DAMAGE = 0.0040;
+const SHAKE_BASE = 0.050;
+const SHAKE_PER_SHOT_CAP = 0.28;
+
+/**
+ * Add a damped shake impulse scaled from the weapon's damage.
+ * @param {Object} game - Game state object with screenShake accumulator
+ * @param {Object} weapon - Weapon definition with damage property
+ * @returns {void}
+ */
+function impactShake(game, weapon) {
+  const n = Math.min(SHAKE_PER_SHOT_CAP, SHAKE_BASE + (weapon.damage || 0) * SHAKE_PER_DAMAGE);
+  game.screenShake = (game.screenShake || 0) + n;
+}
+
+/**
+ * Screen-space spark burst at the point of a confirmed hit. Uses the same
+ * particle schema spawnSystem/renderer already share.
+ * @param {Object} game - Game state object with particles array
+ * @param {number} screenX - Screen-space X coordinate of impact
+ * @param {number} screenY - Screen-space Y coordinate of impact
+ * @param {Object} weapon - Weapon definition with damage and color properties
+ * @returns {void}
+ */
+function spawnHitSparks(game, screenX, screenY, weapon) {
+  if (!game.particles) return;
+  const color = weapon.color || '#ffe08a';
+  const count = 5 + Math.min(7, Math.round((weapon.damage || 0) * 0.12));
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 40 + Math.random() * 90;
+    const life = 0.16 + Math.random() * 0.18;
+    game.particles.push({
+      x: screenX + (Math.random() - 0.5) * 4,
+      y: screenY + (Math.random() - 0.5) * 4,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 25,
+      life, maxLife: life,
+      r: 1 + Math.random() * 1.8,
+      color,
+      smoke: false,
+    });
+  }
+  // Bright flash core so the hit reads instantly even in a busy frame.
+  game.particles.push({
+    x: screenX, y: screenY,
+    vx: 0, vy: 0,
+    life: 0.08, maxLife: 0.08,
+    r: 5 + Math.min(8, (weapon.damage || 0) * 0.08),
+    color: '#ffffff',
+    smoke: false,
+  });
+}
+
+/**
+ * Play either a hit-confirm or miss-splash audio cue.
+ * @param {Object} game - Game state object with audio system
+ * @param {Object} weapon - Weapon definition with impactSound and missSound properties
+ * @param {boolean} hit - True for hit-confirm cue, false for miss/splash cue
+ * @returns {void}
+ */
+function playImpactCue(game, weapon, hit) {
+  if (!game.audio) return;
+  const id = hit
+    ? (weapon.impactSound || DEFAULT_IMPACT_SOUND)
+    : (weapon.missSound || DEFAULT_MISS_SOUND);
+  game.audio.play(id);
+}
+
 export const fireModeHandlers = {
   auto(game, weapon, turret) {
     fireHitscan(game, weapon, turret);
@@ -228,9 +312,14 @@ function fireHitscan(game, weapon, turret) {
     } else {
       applyDamage(game, target, weapon.damage);
     }
+    // Hit confirm: sparks at the impact point, metallic cue, a nudge of shake.
+    spawnHitSparks(game, turret.aimX, turret.aimY, weapon);
+    impactShake(game, weapon);
+    playImpactCue(game, weapon, true);
   } else {
     // FIX 5: missed shot — splash at cursor impact point (water or sand)
     spawnImpactSplash(game, turret.aimX, turret.aimY);
+    playImpactCue(game, weapon, false);
   }
   game.audio && game.audio.play(weapon.sound);
 }
@@ -278,6 +367,12 @@ function fireGuided(game, weapon, turret) {
   game.audio && game.audio.play(weapon.sound);
 }
 
+/**
+ * Attempt to fire the active weapon. Checks ammo and cooldown, decrements ammo if successful,
+ * and dispatches the appropriate fireMode handler.
+ * @param {Object} game - Game state object
+ * @returns {void}
+ */
 export function tryFire(game) {
   const turret = game.turret;
   const weapon = Turret.activeWeapon(turret);
@@ -301,6 +396,12 @@ export function tryFire(game) {
   }
 }
 
+/**
+ * Update weapon cooldowns and handle auto-fire logic each frame.
+ * @param {Object} game - Game state object with turret, input, and projectiles
+ * @param {number} dt - Elapsed time in seconds since last frame
+ * @returns {void}
+ */
 export function update(game, dt) {
   Turret.tickCooldowns(game.turret, dt);
 
@@ -383,6 +484,12 @@ export function update(game, dt) {
   }
 }
 
+/**
+ * Handle input events for weapon selection and firing.
+ * @param {Object} game - Game state object
+ * @param {Object} evt - Input event with type and optional key/dir properties
+ * @returns {void}
+ */
 export function handleInputEvent(game, evt) {
   const turret = game.turret;
   if (evt.type === 'selectWeapon') {

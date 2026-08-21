@@ -4,7 +4,14 @@ import * as Turret from '../engine/turret.js';
 import { currentWaveInfo } from './waveDirector.js';
 import { drawTierStrip } from './upgradeSystem.js';
 
-// Text with a dark drop shadow for legibility over the bright sky/sand.
+/**
+ * Helper to draw text with a dark drop shadow for legibility over bright backgrounds.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {string} text - Text to draw
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @returns {void}
+ */
 function st(ctx, text, x, y) {
   const fill = ctx.fillStyle;
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -13,12 +20,20 @@ function st(ctx, text, x, y) {
   ctx.fillText(text, x, y);
 }
 
+/**
+ * Render all HUD elements each frame.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} game - Game state object
+ * @returns {void}
+ */
 export function render(ctx, game) {
   drawDefenseBar(ctx, game);
   drawScorePanel(ctx, game);
   drawTierStrip(ctx, game);   // weapon upgrade tiers above the pips
   drawWeaponPips(ctx, game);
   drawWaveInfo(ctx, game);
+  drawComboReadout(ctx, game);
+  drawWaveBonus(ctx, game);
   drawEmptyFlash(ctx, game);
 }
 
@@ -26,18 +41,54 @@ function drawDefenseBar(ctx, game) {
   const x = 40, y = 20, w = 320, h = 26;
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
-  ctx.fillStyle = '#3a1010';
+
+  // Threat zones behind the fill: safe / warning / critical banding so the
+  // 50% and 25% thresholds the colour already switches on are readable.
+  ctx.fillStyle = '#3a1010';           // critical zone (0-25%)
   ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#3a2f10';           // warning zone (25-50%)
+  ctx.fillRect(x + w * 0.25, y, w * 0.25, h);
+  ctx.fillStyle = '#122a12';           // safe zone (50-100%)
+  ctx.fillRect(x + w * 0.5, y, w * 0.5, h);
+
   const pct = Math.max(0, game.defense) / 100;
   const color = pct > 0.5 ? '#4ade4a' : pct > 0.25 ? '#e0c040' : '#e04040';
+
+  // Below the critical threshold the whole bar pulses to build tension.
+  ctx.save();
+  if (pct <= 0.25) {
+    const pulse = 0.55 + 0.45 * Math.abs(Math.sin(Date.now() / 160));
+    ctx.globalAlpha = pulse;
+  }
   ctx.fillStyle = color;
   ctx.fillRect(x, y, w * pct, h);
+  ctx.restore();
+
+  // Threshold tick marks at 50% and 25%.
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  [0.5, 0.25].forEach((t) => {
+    const tx = Math.round(x + w * t) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(tx, y - 3);
+    ctx.lineTo(tx, y + h + 3);
+    ctx.stroke();
+  });
+  ctx.restore();
+
   ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
   ctx.strokeRect(x, y, w, h);
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 18px monospace';
   ctx.textAlign = 'left';
-  st(ctx, `DEFENSE ${Math.ceil(game.defense)}%`, x + 6, y + h + 20);
+  let label = `DEFENSE ${Math.ceil(game.defense)}%`;
+  if (pct <= 0.25) {
+    ctx.fillStyle = (Math.floor(Date.now() / 300) % 2) ? '#ff6a6a' : '#fff';
+    label += '  CRITICAL';
+  }
+  st(ctx, label, x + 6, y + h + 20);
 }
 
 function drawScorePanel(ctx, game) {
@@ -96,12 +147,14 @@ function drawWaveInfo(ctx, game) {
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 18px monospace';
 
+  const loopCount = (game.waveState && game.waveState.loopCount) || info.loopCount || 0;
   let label;
   if (info.isLooping) {
-    label = `STAGE 10 (LOOP x${info.loopCount})`;
+    label = `STAGE 10 (LOOP x${loopCount})`;
   } else {
     const total = info.total || 10;
     label = `STAGE ${info.id}/${total}`;
+    if (loopCount > 0) label += ` (LOOP x${loopCount})`;
   }
   // Highlight boss stages in orange
   if (info.hasBoss && !info.isLooping) {
@@ -125,6 +178,63 @@ function drawWaveInfo(ctx, game) {
     ctx.fillText(info.banner.text.toUpperCase(), 640, 188);
     ctx.restore();
   }
+}
+
+/**
+ * Draw the combo readout and timer bar.
+ * Combo state lives on the game object (scoring system). Everything here is
+ * guarded so the HUD still renders if those fields are absent.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} game - Game state object with combo and comboTimer properties
+ * @returns {void}
+ */
+function drawComboReadout(ctx, game) {
+  const combo = game.combo || 0;
+  if (combo <= 1) return;
+  // Kept clear of the SCORE/BEST/STREAK stack (x 1100-1264, y 20-96).
+  const right = 1240, y = 116;
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillStyle = combo >= 10 ? '#ff8a3a' : '#ffd24a';
+  st(ctx, `COMBO x${combo}`, right, y);
+
+  // Remaining combo window as a draining bar under the readout.
+  const win = game.comboWindow || 2.5;
+  const left = Math.max(0, Math.min(win, game.comboTimer || 0));
+  if (left > 0) {
+    const barW = 120, barH = 6, bx = right - barW, by = y + 8;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
+    ctx.fillStyle = '#333';
+    ctx.fillRect(bx, by, barW, barH);
+    ctx.fillStyle = left / win > 0.35 ? '#ffd24a' : '#e04040';
+    ctx.fillRect(bx, by, barW * (left / win), barH);
+  }
+}
+
+/**
+ * Draw end-of-wave bonus flash. Uses a timer when the scoring system supplies one,
+ * otherwise shows the value while it stays non-zero.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} game - Game state object with lastWaveBonus and lastWaveBonusTimer properties
+ * @returns {void}
+ */
+function drawWaveBonus(ctx, game) {
+  const bonus = game.lastWaveBonus || 0;
+  if (!bonus) return;
+  const t = game.lastWaveBonusTimer;
+  let alpha = 1;
+  if (typeof t === 'number') {
+    if (t <= 0) return;
+    alpha = Math.min(1, t / 0.6);
+  }
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 20px monospace';
+  ctx.fillStyle = '#8fe08f';
+  st(ctx, `WAVE BONUS +${bonus}`, 1240, 148);
+  ctx.restore();
 }
 
 function drawEmptyFlash(ctx, game) {

@@ -1,4 +1,8 @@
 {
+  "loop": {
+    "growth": 1.12,
+    "maxMultiplier": 2.2
+  },
   "waves": [
     {
       "id": 1,
@@ -37,7 +41,8 @@
           "enemyId": "landing_craft",
           "count": 3,
           "interval": 14,
-          "startDelay": 2
+          "startDelay": 2,
+          "spawnPattern": "staggered"
         },
         {
           "enemyId": "commando_craft",
@@ -63,24 +68,14 @@
         "hp": 1.15,
         "speed": 1.02
       },
+      "difficultyProfile": "ramp",
       "spawns": [
         {
           "enemyId": "landing_craft",
           "count": 3,
           "interval": 12,
-          "startDelay": 2
-        },
-        {
-          "enemyId": "commando_craft",
-          "count": 2,
-          "interval": 18,
-          "startDelay": 6
-        },
-        {
-          "enemyId": "tank_lst",
-          "count": 2,
-          "interval": 15,
-          "startDelay": 8
+          "startDelay": 2,
+          "spawnPattern": "staggered"
         }
       ],
       "crates": {
@@ -90,7 +85,39 @@
           "howitzer_crate",
           "sam_crate"
         ]
-      }
+      },
+      "phases": [
+        {
+          "name": "FLANKING COMMANDOS",
+          "trigger": {
+            "elapsed": 16
+          },
+          "spawns": [
+            {
+              "enemyId": "commando_craft",
+              "count": 2,
+              "interval": 10,
+              "startDelay": 0,
+              "spawnPattern": "flank"
+            }
+          ]
+        },
+        {
+          "name": "ARMOUR ASHORE",
+          "trigger": {
+            "elapsed": 30,
+            "remaining": 4
+          },
+          "spawns": [
+            {
+              "enemyId": "tank_lst",
+              "count": 2,
+              "interval": 12,
+              "startDelay": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "id": 4,
@@ -100,24 +127,14 @@
         "hp": 1.2,
         "speed": 1.05
       },
+      "difficultyProfile": "swell",
       "spawns": [
         {
           "enemyId": "landing_craft",
-          "count": 4,
-          "interval": 11,
-          "startDelay": 2
-        },
-        {
-          "enemyId": "commando_craft",
           "count": 2,
-          "interval": 14,
-          "startDelay": 4
-        },
-        {
-          "enemyId": "tank_lst",
-          "count": 3,
           "interval": 11,
-          "startDelay": 5
+          "startDelay": 2,
+          "spawnPattern": "volley"
         }
       ],
       "crates": {
@@ -127,7 +144,39 @@
           "howitzer_crate",
           "sam_crate"
         ]
-      }
+      },
+      "phases": [
+        {
+          "name": "ARMOUR WAVE",
+          "trigger": {
+            "remaining": 3
+          },
+          "spawns": [
+            {
+              "enemyId": "tank_lst",
+              "count": 3,
+              "interval": 10,
+              "startDelay": 0,
+              "spawnPattern": "staggered"
+            }
+          ]
+        },
+        {
+          "name": "PINCER",
+          "trigger": {
+            "elapsed": 35
+          },
+          "spawns": [
+            {
+              "enemyId": "commando_craft",
+              "count": 1,
+              "interval": 12,
+              "startDelay": 0,
+              "spawnPattern": "pincer"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": 5,
@@ -181,30 +230,20 @@
         "hp": 1.4,
         "speed": 1.15
       },
+      "difficultyProfile": "swell",
       "spawns": [
         {
           "enemyId": "landing_craft",
           "count": 4,
           "interval": 9,
-          "startDelay": 2
+          "startDelay": 2,
+          "spawnPattern": "staggered"
         },
         {
           "enemyId": "commando_craft",
           "count": 2,
           "interval": 12,
           "startDelay": 4
-        },
-        {
-          "enemyId": "tank_lst",
-          "count": 4,
-          "interval": 9,
-          "startDelay": 3
-        },
-        {
-          "enemyId": "helicopter",
-          "count": 2,
-          "interval": 16,
-          "startDelay": 6
         }
       ],
       "crates": {
@@ -214,7 +253,39 @@
           "howitzer_crate",
           "sam_crate"
         ]
-      }
+      },
+      "phases": [
+        {
+          "name": "AIR CAVALRY",
+          "trigger": {
+            "elapsed": 20
+          },
+          "spawns": [
+            {
+              "enemyId": "helicopter",
+              "count": 2,
+              "interval": 14,
+              "startDelay": 0,
+              "spawnPattern": "flank"
+            }
+          ]
+        },
+        {
+          "name": "ARMOUR SURGE",
+          "trigger": {
+            "elapsed": 40
+          },
+          "spawns": [
+            {
+              "enemyId": "tank_lst",
+              "count": 4,
+              "interval": 9,
+              "startDelay": 0,
+              "spawnPattern": "staggered"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": 7,
@@ -225,6 +296,7 @@
         "hp": 1.55,
         "speed": 1.25
       },
+      "difficultyProfile": "ramp",
       "spawns": [
         {
           "enemyId": "landing_craft",
@@ -268,30 +340,20 @@
         "hp": 1.7,
         "speed": 1.35
       },
+      "difficultyProfile": "spike",
       "spawns": [
         {
-          "enemyId": "landing_craft",
+          "enemyId": "tank_lst",
           "count": 5,
-          "interval": 8,
-          "startDelay": 2
+          "interval": 7,
+          "startDelay": 2,
+          "spawnPattern": "staggered"
         },
         {
           "enemyId": "commando_craft",
           "count": 3,
           "interval": 10,
           "startDelay": 3
-        },
-        {
-          "enemyId": "tank_lst",
-          "count": 5,
-          "interval": 7,
-          "startDelay": 3
-        },
-        {
-          "enemyId": "helicopter",
-          "count": 4,
-          "interval": 10,
-          "startDelay": 5
         }
       ],
       "crates": {
@@ -301,7 +363,40 @@
           "howitzer_crate",
           "sam_crate"
         ]
-      }
+      },
+      "phases": [
+        {
+          "name": "LANDING VOLLEY",
+          "trigger": {
+            "elapsed": 15
+          },
+          "spawns": [
+            {
+              "enemyId": "landing_craft",
+              "count": 2,
+              "interval": 12,
+              "startDelay": 0,
+              "spawnPattern": "volley"
+            }
+          ]
+        },
+        {
+          "name": "GUNSHIPS INBOUND",
+          "trigger": {
+            "elapsed": 38,
+            "remaining": 6
+          },
+          "spawns": [
+            {
+              "enemyId": "helicopter",
+              "count": 4,
+              "interval": 10,
+              "startDelay": 0,
+              "spawnPattern": "flank"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": 9,
@@ -356,30 +451,35 @@
         "hp": 2.5,
         "speed": 1.6
       },
+      "difficultyProfile": "spike",
       "spawns": [
         {
           "enemyId": "landing_craft",
-          "count": 6,
+          "count": 3,
           "interval": 7,
-          "startDelay": 2
+          "startDelay": 2,
+          "spawnPattern": "volley"
         },
         {
           "enemyId": "commando_craft",
           "count": 4,
           "interval": 8,
-          "startDelay": 3
+          "startDelay": 3,
+          "spawnPattern": "flank"
         },
         {
           "enemyId": "tank_lst",
           "count": 6,
           "interval": 6,
-          "startDelay": 2
+          "startDelay": 2,
+          "spawnPattern": "staggered"
         },
         {
           "enemyId": "helicopter",
-          "count": 6,
+          "count": 3,
           "interval": 8,
-          "startDelay": 4
+          "startDelay": 4,
+          "spawnPattern": "pincer"
         }
       ],
       "crates": {

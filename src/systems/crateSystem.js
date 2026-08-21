@@ -2,6 +2,7 @@
 // landed=lost. No crate-id branching — dispatch purely by data fields.
 import { createEntity } from '../engine/entity.js';
 import * as Turret from '../engine/turret.js';
+import * as Upgrades from './upgradeSystem.js';
 
 let crateDefsById = {};
 let crateDefsList = [];
@@ -46,6 +47,8 @@ export function spawnCrate(game, typeIds) {
 }
 
 export function update(game, dt) {
+  Upgrades.updateTimedUpgrades(game, dt);
+
   for (const c of game.crates) {
     // Classify hp<=0 as collected FIRST: weapon damage marks crates dead
     // before this system runs, so a plain `if (c.dead) continue` would skip
@@ -79,6 +82,10 @@ export function update(game, dt) {
     if (c.dead && !c.processed) {
       c.processed = true;
       if (c.collected) {
+        if (c.type.upgradeType) {
+          Upgrades.applyUpgrade(game, c.type);
+          continue;
+        }
         const weaponDef = game.turret.weapons.find(w => w.id === c.type.weaponId);
         const capacity = weaponDef ? weaponDef.ammo : null;
         Turret.refillAmmo(game.turret, c.type.weaponId, c.type.amount, capacity);

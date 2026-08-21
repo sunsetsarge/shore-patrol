@@ -1,0 +1,49 @@
+{
+  "categories": [
+    {
+      "key": "mg",
+      "label": "🔫 MG",
+      "color": "#44aa44",
+      "tiers": [
+        { "name": "M60 MG",         "damage": 3,  "ammo": 300, "cooldown": 0.12 },
+        { "name": ".50 Cal",        "damage": 5,  "ammo": 350, "cooldown": 0.10 },
+        { "name": "Twin .50/30mm",  "damage": 7,  "ammo": 400, "cooldown": 0.08 },
+        { "name": "M134 Minigun",   "damage": 10, "ammo": 500, "cooldown": 0.05 },
+        { "name": "Twin Minigun",   "damage": 14, "ammo": 600, "cooldown": 0.04 }
+      ]
+    },
+    {
+      "key": "howitzer",
+      "label": "💣 Explosive",
+      "color": "#ff6600",
+      "tiers": [
+        { "name": "Bazooka",        "damage": 30, "ammo": 6,  "splashRadius": 60 },
+        { "name": "Mortar",         "damage": 45, "ammo": 8,  "splashRadius": 80 },
+        { "name": "75mm Howitzer",  "damage": 60, "ammo": 12, "splashRadius": 120 },
+        { "name": "105mm How.",     "damage": 90, "ammo": 16, "splashRadius": 160 }
+      ]
+    },
+    {
+      "key": "sam",
+      "label": "🚀 Missile",
+      "color": "#4488ff",
+      "tiers": [
+        { "name": "LAW Rocket",     "damage": 40,  "ammo": 4 },
+        { "name": "RPG-7",          "damage": 55,  "ammo": 6 },
+        { "name": "Stinger SAM",    "damage": 80,  "ammo": 8 },
+        { "name": "ICBM",           "damage": 999, "ammo": 1 }
+      ]
+    },
+    {
+      "key": "pistol",
+      "label": "🔒 Sidearm",
+      "color": "#cc88ff",
+      "tiers": [
+        { "name": "Revolver",       "damage": 1,  "ammo": null },
+        { "name": "M1911",          "damage": 2,  "ammo": null },
+        { "name": "Desert Eagle",   "damage": 3,  "ammo": null },
+        { "name": "Golden Gun",     "damage": 99, "ammo": null, "onReachBonus": 1000 }
+      ]
+    }
+  ]
+}

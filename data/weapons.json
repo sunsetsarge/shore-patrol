@@ -17,6 +17,8 @@
         "crate"
       ],
       "sound": "rapidFire",
+      "impactSound": "impactMetal",
+      "missSound": "impactMiss",
       "color": "#ffd24a",
       "reticle": "cross",
       "turretSprite": "assets/turret/wpn_mg.png",
@@ -39,6 +41,8 @@
         "crate"
       ],
       "sound": "heavyBoom",
+      "impactSound": "impactHeavy",
+      "missSound": "impactMiss",
       "color": "#ff6a3a",
       "reticle": "circle",
       "turretSprite": "assets/turret/wpn_howitzer.png",
@@ -58,6 +62,8 @@
         "air"
       ],
       "sound": "lockTone",
+      "impactSound": "impactHeavy",
+      "missSound": "impactMiss",
       "color": "#5ad1ff",
       "reticle": "diamond",
       "turretSprite": "assets/turret/wpn_sam.png",
@@ -80,6 +86,8 @@
         "crate"
       ],
       "sound": "lightShot",
+      "impactSound": "impactMetal",
+      "missSound": "impactMiss",
       "color": "#e0e0e0",
       "reticle": "cross",
       "turretSprite": "assets/turret/wpn_pistol.png",

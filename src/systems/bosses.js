@@ -5,7 +5,7 @@
 //   game.bossHitCallback(weapon, screenX, screenY) -> pseudo-entity or null
 //   game.bossSplashCallback(weapon, worldX, worldD)
 //   game.bossAirTargetCallback(aimX, aimY, currentBestDist) -> {target,dist} or null
-import { project, CONSTANTS } from '../engine/renderer.js';
+import { project, clamp01, lerp, CONSTANTS } from '../engine/renderer.js';
 import * as Sprites from '../engine/sprites.js';
 
 const { CANVAS_W, CANVAS_H, SEA_Y, HORIZON_Y } = CONSTANTS;
@@ -44,17 +44,15 @@ const SHIP_FEATURES = {
 
 // Convert a sprite (u,v) to a LOCAL pixel offset from the ship origin, given the
 // on-screen ship width w. Mirrors the drawImage() placement exactly.
-function featureLocal(u, v, w) {
-  const drawW = SPRITE_DRAWW_FRAC * w;
+function featureLocalOffset(spriteU, spriteV, shipWidth) {
+  const drawW = SPRITE_DRAWW_FRAC * shipWidth;
   const drawH = drawW * SHIP_ASPECT;
   return {
-    dx: drawW * (u - 0.5),
-    dy: drawH * (v - (1 - SPRITE_WATERFRAC)), // origin sits at the waterline
+    dx: drawW * (spriteU - 0.5),
+    dy: drawH * (spriteV - (1 - SPRITE_WATERFRAC)), // origin sits at the waterline
   };
 }
 
-function lerp(a, b, t) { return a + (b - a) * t; }
-function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 function screenDist(ax, ay, bx, by) {
   const dx = ax - bx, dy = ay - by;
   return Math.sqrt(dx * dx + dy * dy);
@@ -145,11 +143,11 @@ class BattleshipBoss {
   }
 
   // Screen-space position of a named section, given ship's projected (sx,sy,scale).
-  // Anchored to real sprite features via SHIP_FEATURES (see featureLocal()).
+  // Anchored to real sprite features via SHIP_FEATURES (see featureLocalOffset()).
   sectionScreenPos(name, sx, sy, scale) {
     const w = this.worldW * scale;
     const f = SHIP_FEATURES[name] || { u: 0.5, v: 0.7 };
-    const o = featureLocal(f.u, f.v, w);
+    const o = featureLocalOffset(f.u, f.v, w);
     return { x: sx + o.dx, y: sy + o.dy };
   }
 
@@ -311,7 +309,7 @@ class BattleshipBoss {
           radiusWorld: sh.heavy ? 90 : 50, life: 0.5, age: 0,
         });
         game.audio && game.audio.play('heavyBoom');
-        if (sh.heavy && game.screenShake !== undefined) game.screenShake = (game.screenShake||0) + 0.04;
+        if (sh.heavy && game.screenShake !== undefined) game.screenShake = (game.screenShake||0) + 0.45;
         this.shells.splice(i, 1);
       }
     }
@@ -323,6 +321,10 @@ class BattleshipBoss {
         const sectionScores = { fwdTurret:500, rearTurret:400, bridge:700, hullPort:900, engine:500 };
         game.scoreApi && game.scoreApi.onKill(sectionScores[name] || 400);
         game.audio && game.audio.play('explode');
+        // Blowing a boss section apart is the single biggest hit in the game and
+        // previously produced NO shake at all - the only producer was an incoming
+        // heavy shell. Landing one should be felt.
+        game.screenShake = (game.screenShake || 0) + 0.75;
         const { sx, sy, scale } = this.screenPos();
         const sp = this.sectionScreenPos(name, sx, sy, scale);
         game.effects && game.effects.push({ kind:'explosion', x:(sp.x-640)/640,
@@ -421,7 +423,7 @@ class BattleshipBoss {
       // glow (NOT drawn barrels), so it composites cleanly over the rendered ship.
       for (const [key, flash] of [['fwdTurret', this.fwdFlash], ['rearTurret', this.rearFlash]]) {
         if (flash <= 0.02 || s[key].dead) continue;
-        const f = SHIP_FEATURES[key]; const o = featureLocal(f.u, f.v, w);
+        const f = SHIP_FEATURES[key]; const o = featureLocalOffset(f.u, f.v, w);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         const fr = h * 0.30 * (0.5 + flash * 0.6);
@@ -435,11 +437,11 @@ class BattleshipBoss {
       }
 
       // Destroyed sections: scorched crater + live fire, positioned on the real
-      // ship feature (featureLocal), sized by the feature's fxR.
+      // ship feature (featureLocalOffset), sized by the feature's fxR.
       for (const [name, sec] of Object.entries(s)) {
         if (!sec.dead) continue;
         const f = SHIP_FEATURES[name]; if (!f) continue;
-        const o = featureLocal(f.u, f.v, w);
+        const o = featureLocalOffset(f.u, f.v, w);
         this._drawWreck(ctx, o.dx, o.dy, f.fxR * h);
       }
     } else {
@@ -520,9 +522,14 @@ class BattleshipBoss {
   }
 
   _drawHpBars(ctx) {
-    // Compact corner panel – top-right of screen, never over the ship
-    const panelX = ctx.canvas.width - 180;
-    const panelY = 10;
+    // Compact panel – upper-LEFT, below the DEFENSE bar (hud.js:25 occupies
+    // x 36-364, y 16-70). Kept off the top-right because the permanent
+    // SCORE/BEST/STREAK stack lives at x 1100-1264, y 20-96 (hud.js:47/50/53)
+    // and a transient boss panel must yield to it (ADR-004).
+    // Panel box = x 16-188, y 86-196: clear of the defense bar, the score
+    // stack and the weapon pip row (y 656+), with >=8px canvas margins.
+    const panelX = 24;
+    const panelY = 86;
     const barW   = 120;
     const barH   = 10;
 
@@ -985,6 +992,19 @@ export function init(game, _data) {
 }
 
 /**
+ * Boss prefab registry — one entry per boss `type` string used by waveDirector.
+ * `make(stageId, scale)` builds the boss; `defaultScale` applies when the caller
+ * passes no override; `fixedScale` (when present) ignores the caller's override.
+ */
+const bossPrefabs = {
+  battleship:       { make: (id, s) => new BattleshipBoss(id, s), defaultScale: 1.0 },
+  battleship_final: { make: (id, s) => new BattleshipBoss(id, s), defaultScale: 1.5 },
+  bomber:           { make: (id, s) => new BomberBoss(id, s),     defaultScale: 1.0 },
+  // Stage 10 opener: bomber at a fixed 1.2 scale regardless of caller override.
+  final:            { make: (id, s) => new BomberBoss(id, s),     defaultScale: 1.2, fixedScale: 1.2 },
+};
+
+/**
  * Spawn a boss and push it into game.bosses[].
  * Called from waveDirector.js.
  * @param {object} game
@@ -994,19 +1014,12 @@ export function init(game, _data) {
  */
 export function spawnBoss(game, type, stageId, scale) {
   if (!game.bosses) game.bosses = [];
-  let boss;
-  if (type === 'battleship') {
-    boss = new BattleshipBoss(stageId, scale || 1.0);
-  } else if (type === 'battleship_final') {
-    boss = new BattleshipBoss(stageId, scale || 1.5);
-  } else if (type === 'bomber') {
-    boss = new BomberBoss(stageId, scale || 1.0);
-  } else if (type === 'final') {
-    // Stage 10: bomber spawns immediately, battleship added after infantry clear
-    // (waveDirector calls spawnBoss twice — once for 'bomber', once for 'battleship_final')
-    boss = new BomberBoss(stageId, 1.2);
-  }
-  if (boss) game.bosses.push(boss);
+  const prefab = bossPrefabs[type];
+  if (!prefab) return;
+  const boss = prefab.make(stageId, prefab.fixedScale !== undefined
+    ? prefab.fixedScale
+    : (scale || prefab.defaultScale));
+  game.bosses.push(boss);
 }
 
 /**

@@ -4,44 +4,18 @@
 import { project } from '../engine/renderer.js';
 
 // ── Tier definitions ──────────────────────────────────────────────────────────
-export const weaponTiers = {
-  mg: [
-    { name: 'M60 MG',       damage: 3,  ammo: 300, cooldown: 0.12 },
-    { name: '.50 Cal',       damage: 5,  ammo: 350, cooldown: 0.10 },
-    { name: 'Twin .50/30mm', damage: 7,  ammo: 400, cooldown: 0.08 },
-    { name: 'M134 Minigun',  damage: 10, ammo: 500, cooldown: 0.05 },
-    { name: 'Twin Minigun',  damage: 14, ammo: 600, cooldown: 0.04 },
-  ],
-  howitzer: [
-    { name: 'Bazooka',       damage: 30,  ammo: 6,  splashRadius: 60  },
-    { name: 'Mortar',        damage: 45,  ammo: 8,  splashRadius: 80  },
-    { name: '75mm Howitzer', damage: 60,  ammo: 12, splashRadius: 120 },
-    { name: '105mm How.',    damage: 90,  ammo: 16, splashRadius: 160 },
-  ],
-  sam: [
-    { name: 'LAW Rocket',   damage: 40,  ammo: 4  },
-    { name: 'RPG-7',        damage: 55,  ammo: 6  },
-    { name: 'Stinger SAM',  damage: 80,  ammo: 8  },
-    { name: 'ICBM',         damage: 999, ammo: 1  }, // one-shot screen-clear
-  ],
-  pistol: [
-    { name: 'Revolver',     damage: 1,  ammo: null },
-    { name: 'M1911',        damage: 2,  ammo: null },
-    { name: 'Desert Eagle', damage: 3,  ammo: null },
-    { name: 'Golden Gun',   damage: 99, ammo: null }, // "Licensed to Kill"
-  ],
-};
+// Loaded from data/upgrades.json at init(). Kept as a live module-level object
+// (same exported symbol other code binds to) whose keys are category keys and
+// whose values are the tier arrays for that category. No weapon id appears as
+// a literal in this file.
+export const weaponTiers = {};
 
-const CATEGORIES = [
-  { key: 'mg',       label: '🔫 MG',         color: '#44aa44' },
-  { key: 'howitzer', label: '💣 Explosive',  color: '#ff6600' },
-  { key: 'sam',      label: '🚀 Missile',    color: '#4488ff' },
-  { key: 'pistol',   label: '🔒 Sidearm',    color: '#cc88ff' },
-];
+// Panel categories, in draw order. Populated from the same data file.
+let CATEGORIES = [];
 
 const PANEL_W     = 234;
 const BTN_H       = 40;
-const PANEL_H     = 36 + CATEGORIES.length * (BTN_H + 6) + 8;
+let   PANEL_H     = 36 + BTN_H + 6 + 8; // recomputed in init() from CATEGORIES
 const LANDED_TTL  = 10.0; // seconds before a landed crate vanishes
 
 function screenDist(ax, ay, bx, by) {
@@ -51,13 +25,37 @@ function screenDist(ax, ay, bx, by) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function init(game) {
-  game.weaponTiers  = { mg: 0, howitzer: 0, sam: 0, pistol: 0 };
+/**
+ * Initialize the upgrade system with loaded upgrade tier definitions.
+ * @param {Object} game - Game state object to initialize
+ * @param {Object} data - Loaded game data containing upgrade definitions
+ * @returns {void}
+ */
+export function init(game, data) {
+  const categories = (data && data.upgrades && data.upgrades.categories) || [];
+  if (categories.length === 0) {
+    throw new Error('upgradeSystem.init: data.upgrades.categories is empty — data/upgrades.json missing or malformed');
+  }
+  CATEGORIES = categories.map(c => ({ key: c.key, label: c.label, color: c.color }));
+  for (const key of Object.keys(weaponTiers)) delete weaponTiers[key];
+  for (const c of categories) weaponTiers[c.key] = c.tiers;
+  PANEL_H = 36 + CATEGORIES.length * (BTN_H + 6) + 8;
+
+  // Every category starts at tier 0 — keys derived from the loaded data.
+  game.weaponTiers = {};
+  for (const c of CATEGORIES) game.weaponTiers[c.key] = 0;
   game.upgradePanel = null; // { crate, sx, sy } when open
+  game.activeUpgrades = {}; // upgradeType -> { remaining }
 }
 
-// Call from main.js BEFORE WeaponSystem.handleInputEvent on 'fireStart' events.
-// Returns true if the click was consumed (no weapon fire should happen).
+/**
+ * Handle mouse clicks on upgrade crates and UI. Returns true if the click was consumed.
+ * Call from main.js BEFORE WeaponSystem.handleInputEvent on 'fireStart' events.
+ * @param {Object} game - Game state object with crates and panel state
+ * @param {number} screenX - Screen-space X coordinate of click
+ * @param {number} screenY - Screen-space Y coordinate of click
+ * @returns {boolean} True if the click was consumed (panel interaction or crate collection)
+ */
 export function handleClick(game, screenX, screenY) {
   if (game.upgradePanel) {
     return _handlePanelClick(game, screenX, screenY);
@@ -69,6 +67,12 @@ export function handleClick(game, screenX, screenY) {
       if (c.dead || !c.landed) continue;
       const { sx, sy, scale } = project(c.x, 0, 0.02, 'air');
       if (screenDist(screenX, screenY, sx, sy) <= 44 * scale) {
+        if (c.type.upgradeType) {
+          applyUpgrade(game, c.type);
+          c.dead = true;
+          c.collected = false; // already applied; skip the ammo path
+          return true;
+        }
         game.upgradePanel = { crate: c, sx, sy };
         return true; // consumed — don't fire weapon
       }
@@ -77,10 +81,84 @@ export function handleClick(game, screenX, screenY) {
   return false;
 }
 
-// Call each frame from renderPlaying after HUD.
+/**
+ * Draw the upgrade panel UI if it is open.
+ * Call each frame from renderPlaying after HUD.
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Object} game - Game state object with upgrade panel
+ * @returns {void}
+ */
 export function draw(ctx, game) {
   if (!game.upgradePanel) return;
   _drawPanel(ctx, game);
+}
+
+
+// ── Non-weapon upgrade registry ───────────────────────────────────────────────
+// Keyed by the crate's data-driven `upgradeType` string — never by crate id.
+// Each handler: (game, def) => void. Timed effects register themselves in
+// game.activeUpgrades with a `remaining` seconds counter and an `expire` hook.
+
+const RAPID_FIRE_FACTOR = 0.5;
+const MAX_UPGRADE_DURATION = 30; // seconds — hard bound on any timed effect
+
+export const upgradeEffects = {
+  // Turret armour repair: raise defense, clamped to 100.
+  repair(game, def) {
+    const amount = def.amount || 0;
+    game.defense = Math.min(100, (game.defense || 0) + amount);
+  },
+
+  // Timed power-up: temporarily scale every weapon's cooldown down.
+  rapidFire(game, def) {
+    const duration = Math.min(MAX_UPGRADE_DURATION, def.amount || 0);
+    if (duration <= 0) return;
+    const existing = game.activeUpgrades.rapidFire;
+    if (existing) {
+      // Already active — refresh the timer, don't stack the cooldown scaling.
+      existing.remaining = Math.min(MAX_UPGRADE_DURATION, duration);
+      return;
+    }
+    const weapons = (game.turret && game.turret.weapons) || [];
+    const saved = [];
+    for (const w of weapons) {
+      if (typeof w.cooldown === 'number') {
+        saved.push({ weapon: w, cooldown: w.cooldown });
+        w.cooldown = w.cooldown * RAPID_FIRE_FACTOR;
+      }
+    }
+    game.activeUpgrades.rapidFire = {
+      remaining: duration,
+      expire() {
+        for (const s of saved) s.weapon.cooldown = s.cooldown;
+      },
+    };
+  },
+};
+
+// Apply a crate definition carrying an `upgradeType`. Returns true if handled.
+export function applyUpgrade(game, def) {
+  const handler = def && def.upgradeType && upgradeEffects[def.upgradeType];
+  if (!handler) return false;
+  if (!game.activeUpgrades) game.activeUpgrades = {};
+  handler(game, def);
+  game.scoreApi && game.scoreApi.onCrateCollected(250);
+  game.audio && game.audio.play('crate');
+  return true;
+}
+
+// Tick timed upgrades. Called from crateSystem.update (already runs each frame).
+export function updateTimedUpgrades(game, dt) {
+  const active = game.activeUpgrades;
+  if (!active) return;
+  for (const key of Object.keys(active)) {
+    const entry = active[key];
+    entry.remaining -= dt;
+    if (entry.remaining <= 0) {
+      if (typeof entry.expire === 'function') entry.expire();
+      delete active[key];
+    }
+  }
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -103,9 +181,11 @@ function _handlePanelClick(game, screenX, screenY) {
         _applyTier(game, cat.key);
         game.audio && game.audio.play('crate');
 
-        // Golden Gun easter egg
-        if (cat.key === 'pistol' && game.weaponTiers.pistol >= 3) {
-          game.scoreApi && game.scoreApi.onKill(1000);
+        // Data-driven reach bonus (e.g. the top sidearm tier's easter egg):
+        // any tier def may carry `onReachBonus` = score awarded on reaching it.
+        const reached = weaponTiers[cat.key][game.weaponTiers[cat.key]];
+        if (reached && typeof reached.onReachBonus === 'number') {
+          game.scoreApi && game.scoreApi.onKill(reached.onReachBonus);
         }
       }
       // Consume the crate (not shot, no ammo refill)

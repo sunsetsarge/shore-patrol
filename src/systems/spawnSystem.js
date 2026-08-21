@@ -3,13 +3,9 @@
 // definitions by id from the loaded enemies.json map.
 import { createEntity } from '../engine/entity.js';
 import { movementBehaviors } from './movementBehaviors.js';
-import { project, entityMuzzlePoint } from '../engine/renderer.js';
+import { project, entityMuzzlePoint, lerp } from '../engine/renderer.js';
 
 let enemyDefsById = {};
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
 
 export function init(game, data) {
   enemyDefsById = {};
@@ -125,6 +121,43 @@ function spawnExplosionParticles(particles, sx, sy, sizeMultiplier) {
     });
   }
 }
+
+// Registry of spawn patterns keyed by the optional `spawnPattern` field on a
+// wave spawn entry (waves.json). Each fn: (ctx) -> array of world-x positions,
+// one entity spawned per returned position. Same dispatch shape as
+// movementBehaviors — no enemy/wave id branching, purely registry lookup.
+//
+// ctx: { index, count, rng }  index = which spawn tick this is (0-based),
+//                             count = the entry's total tick count.
+export const spawnPatterns = {
+  // Single enemy at a random x — matches the default (patternless) behaviour.
+  trickle(ctx) {
+    return [(ctx.rng() * 2 - 1) * 0.85];
+  },
+
+  // Three abreast, alternating between the right and left halves of the beach.
+  volley(ctx) {
+    const center = (ctx.index % 2) ? 0.4 : -0.4;
+    return [center - 0.22, center, center + 0.22];
+  },
+
+  // One enemy, alternating hard left / hard right edge.
+  flank(ctx) {
+    return [(ctx.index % 2) ? 0.8 : -0.8];
+  },
+
+  // Two enemies at once, mirrored around the centre — closes in from both sides.
+  pincer() {
+    return [-0.7, 0.7];
+  },
+
+  // One enemy, deterministically stepped across the beach left-to-right.
+  staggered(ctx) {
+    if (ctx.count <= 1) return [0];
+    const t = (ctx.index % ctx.count) / (ctx.count - 1);
+    return [-0.85 + 1.7 * t];
+  },
+};
 
 function makeEnemyEntity(enemyId, x, d, difficulty) {
   const def = enemyDefsById[enemyId];

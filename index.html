@@ -67,8 +67,42 @@
 </style>
 
 <script>
-  // Scale the 1280x720 canvas to fill the viewport while preserving 16:9,
-  // without touching its internal resolution (the projection math assumes 1280x720).
+  // Scale the canvas to fill the viewport while preserving 16:9. All game code
+  // keeps drawing in logical 1280x720 coordinates (the projection math assumes
+  // 1280x720); only the pixel backing store below changes.
+  // ---- High-DPI backing store (ADR-008) ----
+  // The canvas is CSS-stretched to fill the viewport, so a fixed 1280x720
+  // backing store throws away detail from the 243-698px source sprites on any
+  // display wider than 1280. The backing store is instead sized to
+  // 1280*s x 720*s where s = min(devicePixelRatio * cssStretch, 2) -- i.e. the
+  // real device pixels the canvas actually occupies, capped at 2x. On an
+  // unstretched 1:1 display this reduces to devicePixelRatio.
+  // src/main.js applies a matching setTransform, so every draw call keeps using
+  // logical 1280x720 coordinates and no drawing coordinate changes anywhere.
+  // canvas.width/height are shimmed to report the LOGICAL size so consumers
+  // that read them for input/layout math (src/engine/input.js:26,
+  // src/systems/upgradeSystem.js:231) keep working unchanged; the native
+  // setters are captured first so the backing store can still be resized.
+  const LOGICAL_W = 1280, LOGICAL_H = 720;
+  const nativeWidthSet = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'width').set;
+  const nativeHeightSet = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'height').set;
+  (function shimLogicalSize() {
+    const canvas = document.getElementById('game-canvas');
+    Object.defineProperty(canvas, 'width', { get: () => LOGICAL_W, configurable: true });
+    Object.defineProperty(canvas, 'height', { get: () => LOGICAL_H, configurable: true });
+  })();
+
+  function updateBackingStore(canvas, cssW) {
+    const stretch = cssW / LOGICAL_W;
+    const scale = Math.min((window.devicePixelRatio || 1) * stretch, 2);
+    const bw = Math.round(LOGICAL_W * scale);
+    if (canvas.__backingW === bw) return;
+    canvas.__backingW = bw;
+    window.__DPR__ = scale;
+    nativeWidthSet.call(canvas, bw);
+    nativeHeightSet.call(canvas, Math.round(LOGICAL_H * scale));
+  }
+
   function resizeCanvas() {
     const canvas = document.getElementById('game-canvas');
     const aspect = 1280 / 720;
@@ -78,10 +112,51 @@
     if (h > availH) { h = availH; w = h * aspect; }
     canvas.style.width = Math.round(w) + 'px';
     canvas.style.height = Math.round(h) + 'px';
+    updateBackingStore(canvas, w);
   }
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('DOMContentLoaded', resizeCanvas);
   resizeCanvas();
+
+  // ---- Verification harness: window.saveShot(name) ----
+  // Captures the CURRENT canvas backing store as a PNG and POSTs it to the
+  // screenshot sink (screenshot_sink.py on :8200), which writes shots/<name>.png.
+  // Reads canvas.width/height dynamically so it keeps working if the backing
+  // store resolution changes. Returns a Promise that resolves when the POST
+  // completes; never throws — it logs one line and resolves false on failure.
+  window.saveShot = function saveShot(name) {
+    const shotName = String(name || 'shot');
+    return new Promise((resolve) => {
+      const canvas = document.getElementById('game-canvas');
+      if (!canvas || !canvas.width || !canvas.height) {
+        console.warn('[saveShot] no #game-canvas backing store; skipped ' + shotName);
+        resolve(false);
+        return;
+      }
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          console.warn('[saveShot] canvas.toBlob returned null for ' + shotName);
+          resolve(false);
+          return;
+        }
+        fetch('http://localhost:8200/?name=' + encodeURIComponent(shotName), {
+          method: 'POST',
+          body: blob,
+          headers: { 'Content-Type': 'image/png' }
+        }).then((res) => {
+          if (!res.ok) {
+            console.warn('[saveShot] sink returned HTTP ' + res.status + ' for ' + shotName);
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        }).catch((err) => {
+          console.warn('[saveShot] POST to :8200 failed for ' + shotName + ': ' + err.message);
+          resolve(false);
+        });
+      }, 'image/png');
+    });
+  };
 
   // Fullscreen toggle on F — works in every game state, own listener so it
   // never conflicts with the module's input handling.

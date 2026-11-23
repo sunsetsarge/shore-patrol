@@ -838,6 +838,9 @@ async function main() {
       if (evt.type === 'pause') {
         game.state = 'playing';
       } else if (evt.type === 'menu') {
+        // Abandoning a run still counts: record its score before leaving
+        // (game over / victory already do this).
+        game.bestScore = ScoreSystem.saveBestIfHigher(game.score);
         game.state = 'menu';
       }
     }

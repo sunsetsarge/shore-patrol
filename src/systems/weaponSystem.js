@@ -14,7 +14,9 @@ let weaponDefs = [];
  * @returns {void}
  */
 export function init(game, data) {
-  weaponDefs = data.weapons.weapons;
+  // Per-run copies: upgrades mutate weapon defs in place, so a restart must
+  // start from the pristine loaded data, not the previous run's upgraded stats.
+  weaponDefs = data.weapons.weapons.map(w => ({ ...w }));
   game.turret = Turret.createTurret(weaponDefs);
   game.projectiles = [];
   game.effects = []; // { kind:'muzzle'|'explosion'|'tracer', ...}

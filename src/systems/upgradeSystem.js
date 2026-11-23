@@ -120,17 +120,19 @@ export const upgradeEffects = {
       return;
     }
     const weapons = (game.turret && game.turret.weapons) || [];
+    // The engine paces fire by `fireRate` (turret.js: cooldown = 1 / fireRate),
+    // so rapid fire scales that — a weapon def has no `cooldown` field.
     const saved = [];
     for (const w of weapons) {
-      if (typeof w.cooldown === 'number') {
-        saved.push({ weapon: w, cooldown: w.cooldown });
-        w.cooldown = w.cooldown * RAPID_FIRE_FACTOR;
+      if (typeof w.fireRate === 'number') {
+        saved.push({ weapon: w, fireRate: w.fireRate });
+        w.fireRate = w.fireRate / RAPID_FIRE_FACTOR;
       }
     }
     game.activeUpgrades.rapidFire = {
       remaining: duration,
       expire() {
-        for (const s of saved) s.weapon.cooldown = s.cooldown;
+        for (const s of saved) s.weapon.fireRate = s.fireRate;
       },
     };
   },

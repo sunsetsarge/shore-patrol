@@ -50,6 +50,16 @@ export function attachInput(canvas, inputState, onFirstGesture) {
     inputState.queue.push({ type: 'fireEnd' });
   });
 
+  // If focus is lost while the button is held (alt-tab, OS popup), the page never
+  // sees the mouseup, so the auto weapon would keep firing on return. Release it.
+  const releaseFire = () => {
+    if (!inputState.mouseDown) return;
+    inputState.mouseDown = false;
+    inputState.queue.push({ type: 'fireEnd' });
+  };
+  window.addEventListener('blur', releaseFire);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) releaseFire(); });
+
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   canvas.addEventListener('wheel', (e) => {

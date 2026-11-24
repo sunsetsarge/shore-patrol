@@ -70,10 +70,11 @@ export function attachInput(canvas, inputState, onFirstGesture) {
     } else if (e.key === 'Escape') {
       // Escape both pauses live play AND is the "No" answer on end-screen
       // retry prompts (victory/gameover) — harmless no-op wherever unused.
-      inputState.queue.push({ type: 'pause' });
+      // Ignore OS auto-repeat so a held key toggles pause once, not per repeat.
+      if (!e.repeat) inputState.queue.push({ type: 'pause' });
       inputState.queue.push({ type: 'confirmNo' });
     } else if (e.key === 'p' || e.key === 'P') {
-      inputState.queue.push({ type: 'pause' });
+      if (!e.repeat) inputState.queue.push({ type: 'pause' });
     } else if (e.key === 'm' || e.key === 'M') {
       inputState.queue.push({ type: 'menu' });
     } else if (e.key === 'y' || e.key === 'Y') {

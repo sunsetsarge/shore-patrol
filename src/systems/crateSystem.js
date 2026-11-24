@@ -96,4 +96,7 @@ export function update(game, dt) {
   }
 
   game.crates = game.crates.filter(c => !c.dead);
+
+  // An upgrade panel must not outlive its crate (landed TTL expiry or a shot): #14.
+  if (game.upgradePanel && game.upgradePanel.crate && game.upgradePanel.crate.dead) game.upgradePanel = null;
 }

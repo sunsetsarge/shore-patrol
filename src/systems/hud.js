@@ -163,7 +163,9 @@ function drawWaveInfo(ctx, game) {
   st(ctx, label, 640, 36);
   ctx.fillStyle = '#fff'; // reset
 
-  if (info.banner) {
+  // The banner timer only ticks while playing, so on the end screens (which
+  // re-use renderPlaying) it would stay frozen on screen under the title.
+  if (info.banner && game.state !== 'gameover' && game.state !== 'victory') {
     const alpha = Math.min(1, info.banner.timer);
     ctx.save();
     ctx.globalAlpha = alpha;
